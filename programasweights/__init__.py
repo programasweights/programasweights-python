@@ -22,7 +22,7 @@ API reference:
     paw.api_key                API key (set via login() or PAW_API_KEY env var)
 """
 
-__version__ = "0.1.0.dev6"
+__version__ = "0.1.0.dev7"
 
 from .config import get_api_url, get_api_key, set_api_key
 

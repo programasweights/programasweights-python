@@ -69,5 +69,5 @@ Links
 
 - **Website**: `programasweights.com <https://programasweights.com>`_
 - **Program Hub**: `programasweights.com/hub <https://programasweights.com/hub>`_
-- **GitHub**: `github.com/programasweights <https://github.com/programasweights/programasweights>`_
+- **GitHub**: `github.com/programasweights <https://github.com/programasweights/programasweights-python>`_
 - **PyPI**: `pypi.org/project/programasweights <https://pypi.org/project/programasweights/>`_

@@ -1,0 +1,81 @@
+site_name: ProgramAsWeights Documentation
+site_url: https://programasweights.readthedocs.io
+site_description: Compile natural language specifications into neural programs that run locally.
+repo_url: https://github.com/yuntian-group/programasweights
+repo_name: yuntian-group/programasweights
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: black
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+    - search.suggest
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Your First Program: getting-started/first-program.md
+    - Naming Programs: getting-started/naming-programs.md
+  - Guide:
+    - How It Works: guide/how-it-works.md
+    - Writing Good Specs: guide/writing-good-specs.md
+    - Local Inference: guide/local-inference.md
+    - Browser Inference: guide/browser-inference.md
+  - API Reference:
+    - Python SDK: api-reference/python-sdk.md
+    - Browser SDK: guide/browser-inference.md
+    - CLI: api-reference/cli.md
+    - REST API: api-reference/rest-api.md
+  - Program Hub:
+    - Browsing Programs: hub/browsing-programs.md
+    - Publishing Programs: hub/publishing-programs.md
+    - Feedback & Cases: hub/feedback-cases.md
+  - Advanced:
+    - Architecture: advanced/architecture.md
+    - Architecture Decision Records: advanced/adrs.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yuntian-group/programasweights
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/programasweights/

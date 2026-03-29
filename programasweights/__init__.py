@@ -69,7 +69,7 @@ def compile(
 def function(
     program_id: str,
     n_ctx: int = 2048,
-    n_gpu_layers: int = -1,
+    n_gpu_layers: int | None = None,
     verbose: bool = False,
 ):
     """Load a compiled program for local inference via llama.cpp.
@@ -80,7 +80,8 @@ def function(
     Args:
         program_id: The program ID from ``paw.compile()``.
         n_ctx: Context window size for llama.cpp.
-        n_gpu_layers: GPU layers (-1 = all, 0 = CPU only).
+        n_gpu_layers: GPU layers (-1 = all, 0 = CPU only). Defaults to CPU.
+            Set ``PAW_GPU_LAYERS`` env var or pass explicitly for GPU acceleration.
         verbose: Print llama.cpp debug output.
 
     Returns:
@@ -91,9 +92,13 @@ def function(
         >>> fn("Urgent: the server is down!")
         'immediate'
     """
+    import os
     import re
     from .cache import is_program_cached, get_program_dir
     from .runtime_llamacpp import PawFunction
+
+    if n_gpu_layers is None:
+        n_gpu_layers = int(os.environ.get("PAW_GPU_LAYERS", "0"))
 
     resolved_id = program_id
     if not re.fullmatch(r"[a-f0-9]{16,64}", program_id):

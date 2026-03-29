@@ -62,7 +62,7 @@ See the [browser SDK repo](https://github.com/programasweights/programasweights-
 
 ## Use with AI Agents
 
-PAW works with Cursor, Copilot, Claude, and other AI coding assistants. Paste this into your agent's chat:
+PAW works with Cursor, Claude, Codex, and other AI coding assistants. Paste this into your agent's chat:
 
 > I want to use ProgramAsWeights (PAW) to create fuzzy text functions that run locally. Read the instructions at https://programasweights.com/agents and help me integrate it.
 

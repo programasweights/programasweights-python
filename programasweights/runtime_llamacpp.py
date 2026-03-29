@@ -29,7 +29,7 @@ class PawFunction:
         self,
         program_dir: str | Path,
         n_ctx: int = 2048,
-        n_gpu_layers: int = -1,
+        n_gpu_layers: int = 0,
         verbose: bool = False,
     ):
         program_dir = Path(program_dir)

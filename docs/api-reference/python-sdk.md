@@ -20,7 +20,7 @@ Loads a compiled program and returns a callable `PawFunction`.
 
 | Parameter | Description |
 |-----------|-------------|
-| `name_or_id` | Program hash ID, a namespaced slug (for example `da03/my-prog`), or an official shorthand such as `email-triage`. |
+| `name_or_id` | Program hash ID, a namespaced slug (for example `programasweights/email-triage`), or an official shorthand such as `email-triage`. |
 | `n_ctx` | Context length passed to the local runtime (default `2048`). |
 | `n_gpu_layers` | Number of layers to offload to GPU in the local runtime (default `0`, CPU-only). |
 | `verbose` | Enable verbose logging from the loader/runtime (default `False`). |

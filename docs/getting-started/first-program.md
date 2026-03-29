@@ -31,13 +31,13 @@ program = paw.compile(
     "Fix malformed JSON: repair missing quotes and trailing commas"
 )
 
-fn = paw.function(program.program_id)
+fn = paw.function(program.id)
 
 output = fn("{name: 'Alice', age: 30,}")
 print(output)
 ```
 
-`program.program_id` is the content-addressable identifier for the compiled artifact you can reuse in code or scripts.
+`program.id` is the content-addressable identifier for the compiled artifact you can reuse in code or scripts.
 
 ## Step 3: Test with different inputs
 
@@ -49,7 +49,7 @@ import programasweights as paw
 program = paw.compile(
     "Fix malformed JSON: repair missing quotes and trailing commas"
 )
-fn = paw.function(program.program_id)
+fn = paw.function(program.id)
 
 samples = [
     '{"ok": true}',

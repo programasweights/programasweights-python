@@ -1,8 +1,8 @@
 site_name: ProgramAsWeights Documentation
 site_url: https://programasweights.readthedocs.io
 site_description: Compile natural language specifications into neural programs that run locally.
-repo_url: https://github.com/yuntian-group/programasweights
-repo_name: yuntian-group/programasweights
+repo_url: https://github.com/programasweights/programasweights-python
+repo_name: programasweights/programasweights-python
 
 theme:
   name: material
@@ -76,6 +76,6 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/yuntian-group/programasweights
+      link: https://github.com/programasweights/programasweights-python
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/programasweights/

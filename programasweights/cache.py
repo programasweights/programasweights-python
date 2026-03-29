@@ -22,8 +22,8 @@ import httpx
 from . import config
 
 BASE_MODEL_URLS = {
-    "qwen3-0.6b-q6_k": "https://huggingface.co/yuntian-deng/Qwen3-0.6B-GGUF-Q6_K/resolve/main/qwen3-0.6b-q6_k.gguf",
-    "gpt2-q6_k": "https://huggingface.co/yuntian-deng/GPT2-GGUF-Q6_K/resolve/main/gpt2-q6_k.gguf",
+    "qwen3-0.6b-q6_k": "https://huggingface.co/programasweights/Qwen3-0.6B-GGUF-Q6_K/resolve/main/qwen3-0.6b-q6_k.gguf",
+    "gpt2-q6_k": "https://huggingface.co/programasweights/GPT2-GGUF-Q6_K/resolve/main/gpt2-q6_k.gguf",
 }
 
 INTERPRETER_TO_GGUF = {

@@ -82,7 +82,7 @@ def download_onnx_models(model_name: str, download_image_encoder: bool = False) 
     Downloads only required files (lazy loading for optional components).
     
     Args:
-        model_name: HuggingFace repo ID (e.g., "yuntian-deng/paw-interpreter-onnx")
+        model_name: HuggingFace repo ID (e.g., "programasweights/paw-interpreter-onnx")
                     OR local path to ONNX models directory
         download_image_encoder: If True, also download image encoder (default: False, lazy)
     

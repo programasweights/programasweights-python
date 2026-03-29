@@ -1,10 +1,10 @@
 # ProgramAsWeights
 
-**Compile natural language specifications into neural programs (.paw files) that run locally.**
+**Compile natural language specs into tiny neural functions that run locally.**
 
-Programs are stored as weight blobs (KV cache prefix + optional LoRA adapters) interpreted by a small fixed model. No API calls needed at runtime — fully deterministic, local execution.
+Define what a function should do in plain English. PAW compiles it into a small neural program that runs on your machine — no API keys at runtime, no internet needed after setup, fully deterministic.
 
-## Installation
+## Install
 
 ```bash
 pip install programasweights
@@ -12,90 +12,100 @@ pip install programasweights
 
 ## Quick Start
 
-### Run a Program
-
 ```python
 import programasweights as paw
 
-# Load and run a compiled program
-fn = paw.function("program_id_or_path.paw")
-result = fn("Contact alice@company.com or bob@example.org")
-print(result)  # ["alice@company.com", "bob@example.org"]
-```
+# Use a pre-compiled function (downloads once, runs locally forever)
+fn = paw.function("email-triage")
+fn("Urgent: the server is down!")        # "immediate"
+fn("Newsletter: spring picnic")          # "wait"
 
-### Compile a Program
-
-```python
-import programasweights as paw
-
-# Compile from natural language specification
-paw.compile(
-    "output.paw",
-    spec="Extract all email addresses from text and return as JSON list",
-    checkpoint_dir="path/to/trained/compiler",
+# Compile your own from a description
+program = paw.compile(
+    "Fix malformed JSON: repair missing quotes and trailing commas",
+    compiler="paw-4b-qwen3-0.6b"  # or "paw-4b-gpt2" for smaller/faster
 )
+fn = paw.function(program.id)
+fn("{name: 'Alice',}")  # '{"name": "Alice"}'
 ```
 
-## LoRA Support (PEFT Compatible)
+## Two Compilers
 
-Already using PEFT for LoRA training? Convert to .paw in one line:
+|                    | Qwen3 0.6B              | GPT-2 124M             |
+|--------------------|-------------------------|------------------------|
+| Compiler name      | `paw-4b-qwen3-0.6b`    | `paw-4b-gpt2`          |
+| Accuracy           | Higher                  | Lower                  |
+| Base model size    | 594 MB                  | 105 MB                 |
+| Program size       | ~22 MB                  | ~5 MB                  |
+| Inference speed    | ~90ms (server)          | ~50ms (server)         |
+| Runs in browser    | No                      | Yes                    |
 
-```python
-import programasweights as paw
+Default is Qwen3 0.6B. Use GPT-2 when you need smaller files or browser deployment.
 
-# Standard PEFT workflow:
-# model = get_peft_model(base_model, LoraConfig(r=16, target_modules=["q_proj", "v_proj"]))
-# trainer.train()
-# model.save_pretrained("my_adapter/")
+## Browser SDK
 
-# Convert to .paw:
-paw.from_peft(
-    "my_adapter/",       # Your PEFT checkpoint
-    "sentiment.paw",     # Output .paw file
-    spec="Classify sentiment as positive or negative",
-    tags=["sentiment", "classification"],
-    examples=[
-        {"input": "Great movie!", "output": "positive"},
-        {"input": "Terrible film.", "output": "negative"},
-    ],
-)
+Programs compiled with GPT-2 also run entirely in the browser via WebAssembly — no server needed, data never leaves the user's device.
 
-# Use it:
-fn = paw.function("sentiment.paw")
-print(fn("This is amazing!"))  # → "positive"
+```bash
+npm install @programasweights/web
 ```
 
-Load LoRA from a .paw file:
+```javascript
+import paw from '@programasweights/web';
 
-```python
-lora_weights, lora_config = paw.load_paw_lora("sentiment.paw")
-print(lora_config)  # {"rank": 16, "alpha": 32, ...}
+const fn = await paw.function('programasweights/email-triage');
+const result = await fn('Urgent: the server is down!');
+// result: "immediate"
 ```
 
-Or use `save_lora_to_paw()` directly if you have raw tensors instead of a PEFT checkpoint.
+See the [browser SDK repo](https://github.com/programasweights/programasweights-js) for full documentation.
 
-## .paw File Format v2
+## Use with AI Agents
 
-A `.paw` file is a self-contained neural program that includes:
+PAW works with Cursor, Copilot, Claude, and other AI coding assistants. Paste this into your agent's chat:
 
-| Component | Description | Required |
-|-----------|-------------|----------|
-| KV cache prefix | Continuous program (prefix weights) | Optional |
-| Pseudo-program | Discrete text instructions | Optional |
-| LoRA adapter | Fine-tuned adapter weights | Optional |
-| Generation config | Temperature, top_p, max_tokens | Optional |
-| Metadata | Interpreter model, spec, author, tags | Required |
+> I want to use ProgramAsWeights (PAW) to create fuzzy text functions that run locally. Read the instructions at https://programasweights.com/agents and help me integrate it.
 
-## Program Hub
+Or save [`AGENTS.md`](https://programasweights.com/agents) to your project root — agents read it automatically.
 
-Browse and share programs at [hub.programasweights.com](https://hub.programasweights.com)
+## When to Use PAW
+
+- **Fuzzy search** — typo-tolerant matching, semantic search, near-duplicate detection
+- **Format repair** — fix broken JSON, normalize dates, repair malformed inputs
+- **Classification** — sentiment, urgency, categories defined in your own words
+- **Extraction** — emails, names, dates from messy unstructured text
+- **Log triage** — extract errors from verbose output, filter noise
+- **Agent preprocessing** — parse tool calls, validate outputs, route tasks
+
+## Authentication
+
+```bash
+# Option 1: environment variable (recommended)
+export PAW_API_KEY=paw_sk_...
+
+# Option 2: CLI login (opens browser to generate key)
+paw login
+```
+
+Generate API keys at [programasweights.com/settings](https://programasweights.com/settings). Authenticated users get higher rate limits.
+
+## CLI
+
+```bash
+paw compile --spec "Extract error lines from logs" --json
+paw run --program <program_id> --input "[ERROR] timeout" --json
+paw login
+```
+
+`--json` gives structured output for programmatic use.
 
 ## Links
 
 - **Website**: [programasweights.com](https://programasweights.com)
 - **Documentation**: [programasweights.readthedocs.io](https://programasweights.readthedocs.io)
-- **GitHub**: [github.com/programasweights/programasweights](https://github.com/programasweights/programasweights)
-- **Program Hub**: [hub.programasweights.com](https://hub.programasweights.com)
+- **Python SDK**: [github.com/programasweights/programasweights-python](https://github.com/programasweights/programasweights-python)
+- **Browser SDK**: [github.com/programasweights/programasweights-js](https://github.com/programasweights/programasweights-js)
+- **Program Hub**: [programasweights.com/hub](https://programasweights.com/hub)
 
 ## License
 

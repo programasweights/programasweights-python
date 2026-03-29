@@ -1,60 +1,52 @@
 """
-Example: Use ProgramAsWeights in a Jupyter Notebook for data cleaning.
+Example: Use ProgramAsWeights in a Jupyter Notebook for data processing.
 
 Copy these cells into a Jupyter notebook.
 
-Cell 1: Install
-    !pip install programasweights pandas
-
-Cell 2: Setup
+Usage:
+    pip install programasweights pandas
 """
-# Cell 2: Load programs
+
+# Cell 1: Setup
 import programasweights as paw
 import pandas as pd
 
-# Load a program (downloads once, cached forever)
-email_extractor = paw.function("programasweights/email-extractor")
+triage = paw.function("email-triage")
 
-# Cell 3: Process a DataFrame
+# Cell 2: Process a DataFrame
 data = pd.DataFrame({
-    "id": [1, 2, 3],
-    "text": [
-        "Contact alice@company.com for sales inquiries",
-        "Reach out to bob@example.org or carol@test.com",
-        "No email addresses in this text",
-    ]
+    "id": [1, 2, 3, 4],
+    "message": [
+        "Urgent: production server is down, customers are affected!",
+        "Newsletter: team picnic next Saturday",
+        "Action needed: submit your quarterly report by EOD",
+        "FYI: new parking policy starts next month",
+    ],
 })
 
-# Apply the neural program to each row
-data["emails"] = data["text"].apply(email_extractor)
-print(data)
+data["urgency"] = data["message"].apply(triage)
 
-# Output:
-#    id                                              text                              emails
-# 0   1       Contact alice@company.com for sales inquiries              ["alice@company.com"]
-# 1   2  Reach out to bob@example.org or carol@test.com  ["bob@example.org", "carol@test.com"]
-# 2   3                No email addresses in this text                                     []
+print(data[["id", "message", "urgency"]])
+#    id                                            message    urgency
+# 0   1  Urgent: production server is down, customers...  immediate
+# 1   2           Newsletter: team picnic next Saturday       wait
+# 2   3  Action needed: submit your quarterly report b...  immediate
+# 3   4    FYI: new parking policy starts next month       wait
 
+# Cell 3: Compile a custom function for log triage
+log_triage = paw.function(
+    paw.compile(
+        "Extract only lines indicating errors or failures from this log, "
+        "ignore info and debug lines"
+    ).id
+)
 
-# Cell 4: Batch processing (more efficient)
-texts = data["text"].tolist()
-# Programs accept lists for batch processing
-results = [email_extractor(t) for t in texts]
-print(results)
+logs = """[INFO] Server started on port 8080
+[DEBUG] Loading config...
+[ERROR] Connection refused: database timeout
+[INFO] Retrying...
+[ERROR] Max retries exceeded"""
 
-
-# Cell 5: Compare with regex approach
-"""
-# Traditional regex approach (fragile, misses edge cases):
-import re
-pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-data["emails_regex"] = data["text"].apply(lambda x: re.findall(pattern, x))
-
-# ProgramAsWeights approach (robust, handles edge cases):
-data["emails_paw"] = data["text"].apply(email_extractor)
-
-# Both produce same results, but PAW handles:
-# - Obfuscated emails (alice [at] company.com)
-# - Emails with unusual TLDs
-# - Context-dependent extraction
-"""
+print(log_triage(logs))
+# [ERROR] Connection refused: database timeout
+# [ERROR] Max retries exceeded

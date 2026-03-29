@@ -34,7 +34,7 @@ program = paw.compile(
 )
 
 # Use the compiled program
-fn = paw.function(program.program_id)
+fn = paw.function(program.id)
 fn("{name: 'Alice', age: 30,}")  # '{"name": "Alice", "age": 30}'
 ```
 

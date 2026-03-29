@@ -17,10 +17,10 @@ You can load a program by this ID with `paw.function("<id>")` wherever you have 
 Signed-in users may register aliases in `username/name` form, for example:
 
 ```text
-da03/my-classifier
+yourname/my-classifier
 ```
 
-Aliases are unique per user: you cannot register two different programs both named `da03/foo`.
+Aliases are unique per user: you cannot register two different programs both named `yourname/foo`.
 
 Multiple aliases may point to the same underlying program (same content hash).
 
@@ -35,7 +35,7 @@ Programs published under the `programasweights/` namespace are the official cata
 Programs published under a user or organization prefix must include that prefix when loading:
 
 ```python
-paw.function("da03/custom-filter")
+paw.function("yourname/custom-filter")
 ```
 
 Omitting the prefix is only valid for official names in the `programasweights/` namespace.

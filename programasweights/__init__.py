@@ -1,20 +1,23 @@
 """
-ProgramAsWeights (PAW): Compile natural language specs into neural programs.
+ProgramAsWeights (PAW): Compile natural language specs into tiny neural
+functions that run locally.
 
 Quick start:
     import programasweights as paw
 
-    # Compile on the server
-    program = paw.compile("Classify sentiment as positive or negative")
+    # Use a pre-compiled function (downloads once, runs locally forever)
+    fn = paw.function("email-triage")
+    fn("Urgent: server is down!")  # "immediate"
 
-    # Run locally via llama.cpp (downloads base model on first use)
+    # Compile your own from a description
+    program = paw.compile("Fix malformed JSON: repair missing quotes and trailing commas")
     fn = paw.function(program.id)
-    fn("I love this!")  # -> "positive"
+    fn("{name: 'Alice',}")  # '{"name": "Alice"}'
 
 API reference:
     paw.compile(spec)          Compile a spec on the server, returns Program
     paw.function(program_id)   Load a compiled program for local inference
-    paw.login(email)           Authenticate and store API key
+    paw.login()                Save API key for higher rate limits
     paw.api_url                Server URL (default: https://programasweights.com)
     paw.api_key                API key (set via login() or PAW_API_KEY env var)
 """
@@ -52,13 +55,11 @@ def compile(
 
     Example:
         >>> program = paw.compile(
-        ...     "Classify sentiment as positive or negative.\\n"
-        ...     "Examples:\\n"
-        ...     "Input: I love it\\nOutput: positive\\n"
-        ...     "Input: I hate it\\nOutput: negative"
+        ...     "Fix malformed JSON: repair missing quotes and trailing commas"
         ... )
-        >>> print(program.id)
-        '4a533a4fb0a10f219384'
+        >>> fn = paw.function(program.id)
+        >>> fn("{name: 'Alice',}")
+        '{"name": "Alice"}'
     """
     from .client import PAWClient
     client = PAWClient(api_url=api_url, api_key=api_key)
@@ -86,9 +87,9 @@ def function(
         A callable ``PawFunction`` that takes an input string and returns output.
 
     Example:
-        >>> fn = paw.function("4a533a4fb0a10f219384")
-        >>> fn("I love this product!")
-        'positive'
+        >>> fn = paw.function("email-triage")
+        >>> fn("Urgent: the server is down!")
+        'immediate'
     """
     import re
     from .cache import is_program_cached, get_program_dir

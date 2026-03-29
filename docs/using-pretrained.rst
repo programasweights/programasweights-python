@@ -204,7 +204,7 @@ Finding the Right Program
 Visit ``https://huggingface.co/programasweights/{task-name}`` for detailed docs.
 
 **Request new programs:**
-If you need a program that doesn't exist, `open an issue <https://github.com/paw/programasweights/issues>`_ with your use case.
+If you need a program that doesn't exist, `open an issue <https://github.com/programasweights/programasweights-python/issues>`_ with your use case.
 
 Performance Characteristics
 ---------------------------

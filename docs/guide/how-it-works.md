@@ -26,7 +26,7 @@ The LoRA weights are quantized to **Q4_0** GGUF format (on the order of **23 MB*
 
 When you run a program locally:
 
-- The SDK loads a **Q6_K** base model (Qwen3-0.6B, about **594 MB**, downloaded once).
+- The SDK loads the standard interpreter (Qwen3 0.6B, about **594 MB**, downloaded once).
 - It applies the **Q4_0** LoRA adapter from the bundle.
 - The pseudo-program is prepended as a **prompt prefix**; user input follows.
 - Inference uses **llama.cpp** (CPU or GPU backends as configured).

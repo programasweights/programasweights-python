@@ -2,7 +2,7 @@
 
 Run PAW programs directly in the browser via WebAssembly. No server, no API key, no setup.
 
-Programs compiled with the GPT-2 124M interpreter run entirely client-side. The base model (105 MB) downloads once and is cached; each program adds only ~5 MB.
+Programs compiled with the compact interpreter (GPT-2 124M) run entirely client-side. The base model (105 MB) downloads once and is cached; each program adds only ~5 MB.
 
 ## Quick Start
 
@@ -42,7 +42,7 @@ await fn.free();
 
 ## How It Works
 
-1. **Base model** — GPT-2 124M Q6_K GGUF (105 MB) downloads from HuggingFace CDN and is cached in the browser after first load.
+1. **Base model** — Compact interpreter (GPT-2 124M, 105 MB) downloads from HuggingFace CDN and is cached in the browser after first load.
 2. **LoRA adapter** — Each program is a ~5 MB Q4_0 GGUF LoRA adapter that specializes the base model for a specific task.
 3. **Prefix cache** — A precomputed KV cache (~7 MB) eliminates the prompt prefill step, making the first inference call fast.
 4. **Inference** — Runs via WebAssembly (llama.cpp compiled to WASM with SIMD). ~200ms per call on Chrome.
@@ -134,6 +134,6 @@ Without these headers, the SDK falls back to single-threaded WASM (still functio
 
 ## Limitations
 
-- Only programs compiled with the **GPT-2 124M** interpreter are supported. Programs compiled with Qwen3 0.6B are too large for browser inference (~594 MB base model).
+- Only programs compiled with the **compact** interpreter (GPT-2 124M) are supported. Programs compiled with the standard interpreter (Qwen3 0.6B) are too large for browser inference (~594 MB base model).
 - The 105 MB base model download may be slow on mobile connections.
 - Performance varies by browser (Chrome is fastest).

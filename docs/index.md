@@ -60,7 +60,7 @@ At runtime, the SDK loads a Q6_K base model (~594 MB, downloaded once) and appli
 
 ## Browser Inference
 
-Programs compiled with the GPT-2 124M interpreter also run directly in the browser via WebAssembly -- no server needed:
+Programs compiled with the compact interpreter (GPT-2 124M) also run directly in the browser via WebAssembly -- no server needed:
 
 ```html
 <script type="module">

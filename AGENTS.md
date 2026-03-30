@@ -68,6 +68,7 @@ Use this when you want to offload all computation to the user's browser: zero se
 - **Classification** — sentiment, urgency, categories defined in your own words
 - **Extraction** — emails, names, dates from messy unstructured text
 - **Log triage** — extract errors from verbose output, filter noise
+- **Intent routing** — map user descriptions to the closest URL, menu item, or setting
 - **Agent preprocessing** — parse tool calls, validate outputs, route tasks
 
 ## Authentication

@@ -32,7 +32,7 @@ fn("{name: 'Alice',}")  # '{"name": "Alice"}'
 
 ## Two Compilers
 
-| | Qwen3 0.6B | GPT-2 124M |
+| | Standard (Qwen3 0.6B) | Compact (GPT-2 124M) |
 |---|---|---|
 | Compiler name | `paw-4b-qwen3-0.6b` | `paw-4b-gpt2` |
 | Accuracy | Higher | Lower |
@@ -41,7 +41,7 @@ fn("{name: 'Alice',}")  # '{"name": "Alice"}'
 | Inference speed | ~90ms (server) | ~50ms (server) |
 | Runs in browser | No | Yes |
 
-Default is Qwen3 0.6B. Use GPT-2 when you need smaller files or browser deployment.
+Default is Standard (Qwen3 0.6B). Use Compact (GPT-2) when you need smaller files or browser deployment.
 
 ## Browser / JavaScript SDK
 

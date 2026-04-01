@@ -77,7 +77,7 @@ Output: delete
 """)
 ```
 
-- State output constraints explicitly: "Return ONLY one of: X, Y, Z"
+- State output constraints explicitly if any: "Return ONLY one of: X, Y, Z"
 - Each function is stateless: one input, one output. No conversation history.
 - Write a few test inputs with expected outputs, then try different spec phrasings and pick the one that passes the most.
 

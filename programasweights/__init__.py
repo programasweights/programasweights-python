@@ -22,7 +22,7 @@ API reference:
     paw.api_key                API key (set via login() or PAW_API_KEY env var)
 """
 
-__version__ = "0.1.0.dev7"
+__version__ = "0.2.1"
 
 from .config import get_api_url, get_api_key, set_api_key
 
@@ -37,33 +37,38 @@ def compile(
     name: str | None = None,
     tags: list[str] | None = None,
     public: bool = True,
+    slug: str | None = None,
 ):
     """Compile a natural language specification into a neural program.
 
     The compilation runs on the PAW server. The resulting program can be
-    downloaded and run locally via ``paw.function(program.id)``.
+    downloaded and run locally via ``paw.function(program.id)`` or
+    ``paw.function(program.slug)`` if a slug was provided.
 
     Args:
         spec: Full specification text. Include examples in the text if desired.
         compiler: Compiler model (alias or snapshot name).
-        name: Human-readable program name for the hub.
+        name: Human-readable program name (display title for the hub).
         tags: Tags for hub discovery.
         public: Whether to list on the public hub.
+        slug: URL-safe handle (e.g. 'message-classifier'). Creates a
+            ``username/slug`` alias. Requires authentication.
 
     Returns:
-        A ``Program`` object with ``id``, ``status``, and ``timings``.
+        A ``Program`` object with ``id``, ``slug``, ``status``, and ``timings``.
 
     Example:
         >>> program = paw.compile(
-        ...     "Fix malformed JSON: repair missing quotes and trailing commas"
+        ...     "Fix malformed JSON: repair missing quotes and trailing commas",
+        ...     slug="json-fixer"
         ... )
-        >>> fn = paw.function(program.id)
+        >>> fn = paw.function(program.slug)  # or paw.function(program.id)
         >>> fn("{name: 'Alice',}")
         '{"name": "Alice"}'
     """
     from .client import PAWClient
     client = PAWClient(api_url=api_url, api_key=api_key)
-    return client.compile(spec, compiler=compiler, name=name, tags=tags, public=public)
+    return client.compile(spec, compiler=compiler, name=name, tags=tags, public=public, slug=slug)
 
 
 def function(
@@ -94,7 +99,7 @@ def function(
     """
     import os
     import re
-    from .cache import is_program_cached, get_program_dir
+    from .cache import is_program_cached, get_program_dir, get_cached_slug, save_slug_mapping
     from .runtime_llamacpp import PawFunction
 
     if n_gpu_layers is None:
@@ -102,9 +107,14 @@ def function(
 
     resolved_id = program_id
     if not re.fullmatch(r"[a-f0-9]{16,64}", program_id):
-        from .client import PAWClient
-        client = PAWClient(api_url=api_url, api_key=api_key)
-        resolved_id = client.resolve_slug(program_id)
+        cached = get_cached_slug(program_id)
+        if cached:
+            resolved_id = cached
+        else:
+            from .client import PAWClient
+            client = PAWClient(api_url=api_url, api_key=api_key)
+            resolved_id = client.resolve_slug(program_id)
+            save_slug_mapping(program_id, resolved_id)
 
     if not is_program_cached(resolved_id):
         from .client import PAWClient

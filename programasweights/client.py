@@ -23,6 +23,7 @@ class Program:
     """Result of a compilation."""
     id: str
     status: str
+    slug: Optional[str] = None
     compiler_snapshot: Optional[str] = None
     timings: Optional[dict] = None
     error: Optional[str] = None
@@ -48,27 +49,32 @@ class PAWClient:
         name: str | None = None,
         tags: list[str] | None = None,
         public: bool = True,
+        slug: str | None = None,
     ) -> Program:
         """Compile a spec into a neural program on the server.
 
         Args:
             spec: Natural language specification. Include examples in the text.
             compiler: Compiler name (alias or snapshot).
-            name: Human-readable program name.
+            name: Human-readable program name (display title).
             tags: Tags for hub discovery.
             public: Whether to list on the public hub.
+            slug: URL-safe handle (e.g. 'message-classifier'). Creates a
+                ``username/slug`` alias for easy reference. Requires auth.
 
         Returns:
-            Program with id, status, and timings.
+            Program with id, slug, status, and timings.
 
         Raises:
             httpx.HTTPStatusError: On API errors (422 for validation, 429 for rate limit).
         """
-        body = {"spec": spec, "compiler": compiler, "public": public}
+        body: dict = {"spec": spec, "compiler": compiler, "public": public}
         if name:
             body["name"] = name
         if tags:
             body["tags"] = tags
+        if slug:
+            body["slug"] = slug
 
         resp = httpx.post(
             f"{self._api_url}/api/v1/compile",
@@ -82,6 +88,7 @@ class PAWClient:
         return Program(
             id=data.get("program_id", ""),
             status=data.get("status", "unknown"),
+            slug=data.get("slug"),
             compiler_snapshot=data.get("compiler_snapshot"),
             timings=data.get("timings"),
             error=data.get("error"),

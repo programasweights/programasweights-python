@@ -4,16 +4,18 @@ Local cache management for base models and compiled programs.
 Cache structure:
     ~/.cache/programasweights/
         base_models/
-            qwen3-0.6b-q6k.gguf       # ~623 MB, downloaded once
+            qwen3-0.6b-q6_k.gguf      # ~623 MB, downloaded once
         programs/
             <program_id>/
                 adapter.gguf            # ~23 MB, Q4_0 LoRA
                 prompt_template.txt
                 meta.json
+        slug_cache.json                 # slug -> program_id mapping
 """
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -34,7 +36,12 @@ INTERPRETER_TO_GGUF = {
 
 def get_base_model_path(interpreter: str = "Qwen/Qwen3-0.6B") -> Path:
     """Get the path to the base model GGUF, downloading if needed."""
-    gguf_name = INTERPRETER_TO_GGUF.get(interpreter, "qwen3-0.6b-q6k")
+    gguf_name = INTERPRETER_TO_GGUF.get(interpreter)
+    if not gguf_name:
+        raise ValueError(
+            f"Unknown interpreter: '{interpreter}'. "
+            f"Supported: {list(INTERPRETER_TO_GGUF.keys())}"
+        )
     gguf_path = config.get_base_models_dir() / f"{gguf_name}.gguf"
 
     if gguf_path.exists():
@@ -80,3 +87,36 @@ def _download_file(url: str, dest: Path):
                     mb = downloaded / 1024 / 1024
                     print(f"\r  {mb:.1f} MB ({pct:.0f}%)", end="", flush=True)
         print()
+
+
+def _slug_cache_path() -> Path:
+    return config.get_cache_dir() / "slug_cache.json"
+
+
+def get_cached_slug(slug: str) -> str | None:
+    """Look up a slug in the local cache. Returns program_id or None."""
+    path = _slug_cache_path()
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+        program_id = data.get(slug)
+        if program_id and is_program_cached(program_id):
+            return program_id
+    except (json.JSONDecodeError, OSError):
+        pass
+    return None
+
+
+def save_slug_mapping(slug: str, program_id: str) -> None:
+    """Save a slug -> program_id mapping to the local cache."""
+    path = _slug_cache_path()
+    data: dict = {}
+    if path.exists():
+        try:
+            data = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    data[slug] = program_id
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data))

@@ -3,23 +3,21 @@
 Install the ProgramAsWeights SDK from PyPI:
 
 ```bash
-pip install --pre programasweights
+pip install programasweights --extra-index-url https://pypi.programasweights.com/simple/
 ```
+
+The `--extra-index-url` flag provides pre-built binaries for `llama-cpp-python`, making installation fast (~10 seconds). Without it, the C++ backend compiles from source (~5 minutes).
 
 ## Requirements
 
-- **Python:** 3.9 through 3.12. Python 3.13 is not supported yet because `llama-cpp-python` does not support it.
-
-## First-time build
-
-`llama-cpp-python` may compile from source on first install. Expect roughly five minutes; this is normal.
+- **Python:** 3.9 through 3.13.
 
 ## Anaconda on Linux: OpenMP / libgomp errors
 
-If the build fails with `libgomp`-related errors, disable OpenMP for the GGML build:
+If the build fails with `libgomp`-related errors, disable OpenMP:
 
 ```bash
-CMAKE_ARGS="-DGGML_OPENMP=OFF" pip install --pre programasweights
+CMAKE_ARGS="-DGGML_OPENMP=OFF" pip install programasweights --extra-index-url https://pypi.programasweights.com/simple/
 ```
 
 ## Cache and configuration

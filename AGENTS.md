@@ -8,7 +8,7 @@ Docs: https://programasweights.readthedocs.io
 ## Install
 
 ```bash
-pip install --pre programasweights
+pip install programasweights --extra-index-url https://pypi.programasweights.com/simple/
 ```
 
 ## Usage
@@ -71,26 +71,42 @@ Use this when you want to offload all computation to the user's browser: zero se
 - **Intent routing** — map user descriptions to the closest URL, menu item, or setting
 - **Agent preprocessing** — parse tool calls, validate outputs, route tasks
 
-## Authentication
+## Authentication (optional)
+
+Everything works without authentication. Sign in for higher rate limits and program naming.
 
 ```bash
-# Option 1: environment variable (recommended)
 export PAW_API_KEY=paw_sk_...
-
-# Option 2: CLI login (opens browser to generate key)
-paw login
 ```
 
-Generate API keys at https://programasweights.com/settings
+Generate API keys at https://programasweights.com/settings. The SDK reads `PAW_API_KEY` from the environment automatically.
 
-The SDK automatically reads `PAW_API_KEY` from the environment. Authenticated users get higher rate limits (60 compiles/hr vs 5 for anonymous).
+| | Anonymous | Authenticated |
+|---|---|---|
+| Compile rate limit | 20/hr | 60/hr |
+| Name programs (slugs) | No | Yes |
+
+## Program Naming
+
+Every compiled program gets an immutable hash ID (e.g. `a6b454023d41ac9ca845`). Authenticated users can also assign a human-readable slug:
+
+```python
+program = paw.compile("Classify sentiment", slug="my-classifier")
+# program.id   -> "a6b454023d41ac9ca845"
+# program.slug -> "da03/my-classifier"
+
+fn = paw.function("da03/my-classifier")  # by slug (requires auth to create)
+fn = paw.function("a6b454023d41ac9ca845") # by hash (always works)
+```
 
 ## CLI
 
 ```bash
-paw compile --spec "Classify sentiment as positive or negative" --json
+paw compile --spec "Classify sentiment" --json
 paw run --program <program_id> --input "I love this!" --json
-paw login  # Save API key for higher rate limits
+paw info <program_id>             # show program metadata
+paw rename <program_id> my-slug   # name a program (requires auth)
+paw login                         # save API key
 ```
 
 `--json` gives structured output for programmatic use.
@@ -98,9 +114,9 @@ paw login  # Save API key for higher rate limits
 ## API
 
 ```python
-paw.compile(spec, compiler="paw-4b-qwen3-0.6b")  # Compile a spec
-paw.function(name_or_id)                           # Load a compiled program
-paw.login()                                        # Save API key
+paw.compile(spec)                 # compile (returns Program with .id)
+paw.function(program_id_or_slug)  # load for local inference
+paw.login()                       # save API key
 ```
 
 ## Browse Programs

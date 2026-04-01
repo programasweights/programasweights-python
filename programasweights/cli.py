@@ -3,10 +3,11 @@
 ProgramAsWeights CLI.
 
 Usage:
-    paw compile <spec>             Compile a spec on the server
-    paw run <program_id> <input>   Run a program locally
-    paw login                      Authenticate with email
-    paw info <program_id>          Show program metadata
+    paw compile --spec "..."       Compile a spec on the server
+    paw run --program <id> --input "..."   Run a program locally
+    paw rename <program> <slug>    Set or change a program's slug
+    paw info <program>             Show program metadata
+    paw login [key]                Save API key for authentication
 
 All commands support --json for structured output (agent-friendly).
 """
@@ -26,11 +27,13 @@ def cmd_compile(args):
     if not args.json:
         print(f"Compiling: {args.spec[:80]}...")
 
-    program = paw.compile(args.spec, compiler=args.compiler)
+    public = not getattr(args, 'private', False)
+    program = paw.compile(args.spec, compiler=args.compiler, slug=getattr(args, 'slug', None), public=public)
 
     if args.json:
         print(json.dumps({
             "program_id": program.id,
+            "slug": program.slug,
             "status": program.status,
             "error": program.error,
             "timings": program.timings,
@@ -42,15 +45,18 @@ def cmd_compile(args):
         return 1
 
     print(f"Program ID: {program.id}")
+    if program.slug:
+        print(f"Slug: {program.slug}")
     print(f"Status: {program.status}")
     if program.timings:
         total = program.timings.get("total_ms", 0)
         print(f"Total time: {total:.0f}ms")
+    ref = program.slug or program.id
     print(f"\nTo run locally:")
-    print(f"  paw run {program.id} \"your input here\"")
+    print(f"  paw run --program \"{ref}\" --input \"your input here\"")
     print(f"\nOr in Python:")
     print(f"  import programasweights as paw")
-    print(f"  fn = paw.function(\"{program.id}\")")
+    print(f"  fn = paw.function(\"{ref}\")")
     print(f"  fn(\"your input here\")")
     return 0
 
@@ -59,6 +65,8 @@ def cmd_run(args):
     import programasweights as paw
     if args.api_url:
         paw.api_url = args.api_url
+    if args.api_key:
+        paw.api_key = args.api_key
 
     fn = paw.function(
         args.program, verbose=args.verbose,
@@ -80,10 +88,43 @@ def cmd_login(args):
     return 0
 
 
+def cmd_rename(args):
+    import programasweights as paw
+    if args.api_url:
+        paw.api_url = args.api_url
+    if args.api_key:
+        paw.api_key = args.api_key
+
+    import httpx
+    from programasweights.client import PAWClient
+    client = PAWClient(api_url=paw.api_url, api_key=paw.api_key)
+
+    resp = httpx.patch(
+        f"{client._api_url}/api/v1/programs/{args.program}",
+        json={"slug": args.new_slug},
+        headers=client._headers(),
+        timeout=10.0,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    if args.json:
+        print(json.dumps(data))
+    else:
+        slug = data.get("slug")
+        if slug:
+            print(f"Renamed to: {slug}")
+        else:
+            print("Slug removed.")
+    return 0
+
+
 def cmd_info(args):
     import programasweights as paw
     if args.api_url:
         paw.api_url = args.api_url
+    if args.api_key:
+        paw.api_key = args.api_key
 
     from programasweights.client import PAWClient
     client = PAWClient(api_url=paw.api_url, api_key=paw.api_key)
@@ -129,6 +170,8 @@ def main():
     p = sub.add_parser("compile", help="Compile a spec on the server")
     p.add_argument("--spec", required=True, help="Natural language specification")
     p.add_argument("--compiler", default="paw-4b-qwen3-0.6b", help="Compiler model")
+    p.add_argument("--slug", default=None, help="URL-safe handle (e.g. 'message-classifier')")
+    p.add_argument("--private", action="store_true", help="Make program private (not listed on hub)")
     p.add_argument("--json", action="store_true", help="JSON output")
 
     p = sub.add_parser("run", help="Run a program locally via llama.cpp")
@@ -141,6 +184,11 @@ def main():
 
     p = sub.add_parser("login", help="Save API key for authentication")
     p.add_argument("key", nargs="?", default=None, help="API key (paw_sk_...). Omit to open browser.")
+
+    p = sub.add_parser("rename", help="Set or change a program's slug")
+    p.add_argument("program", help="Program ID or current slug")
+    p.add_argument("new_slug", help="New slug (e.g. 'message-classifier') or empty string to remove")
+    p.add_argument("--json", action="store_true", help="JSON output")
 
     p = sub.add_parser("info", help="Show program info")
     p.add_argument("program", help="Program name or ID")
@@ -156,6 +204,7 @@ def main():
         "compile": cmd_compile,
         "run": cmd_run,
         "login": cmd_login,
+        "rename": cmd_rename,
         "info": cmd_info,
     }
 

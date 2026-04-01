@@ -25,22 +25,26 @@ Compile a specification.
 
 **Request body (JSON):**
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `spec` | string | Natural-language specification. |
-| `compiler` | string | Compiler identifier. |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `spec` | string | Yes | Natural-language specification. |
+| `compiler` | string | No | Compiler identifier (default: `paw-4b-qwen3-0.6b`). |
+| `slug` | string | No | URL-safe handle (e.g. `message-classifier`). Creates a `username/slug` alias. Requires auth. |
+| `public` | boolean | No | List on public hub (default: true). |
+| `name` | string | No | Display title. Auto-generated if omitted. |
+| `tags` | string[] | No | Tags for discovery. |
 
-**Response (JSON):** includes `job_id`, `status`, `program_id`, `pseudo_program`, and `timings` as applicable to the job state.
+**Response (JSON):** includes `job_id`, `status`, `program_id`, `slug` (if created), `pseudo_program`, and `timings`.
 
 ### `POST /infer`
 
-Run inference for a compiled program (server-side execution when offered by the deployment).
+Run inference for a compiled program (server-side execution).
 
 **Request body (JSON):**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `program_id` | string | Program identifier. |
+| `program_id` | string | Program identifier — hash ID or slug (e.g. `da03/message-classifier`). |
 | `input` | string | Input text. |
 | `max_tokens` | integer | Maximum tokens to generate. |
 | `temperature` | number | Sampling temperature. |
@@ -65,39 +69,50 @@ List or search programs.
 
 ### `GET /programs/{id_or_slug}`
 
-Program detail including aliases, specification, and pseudo-program where exposed by policy.
+Program detail. Accepts hash ID or slug. Private programs return 404 to non-owners.
 
-### `GET /programs/{id}/download`
+**Response** includes: `id`, `name`, `spec`, `interpreter`, `public`, `aliases`, `user_slug`, `author`, `tags`, `upvotes`, `downloads`, `created_at`.
 
-Redirects to the Hugging Face CDN for the `.paw` artifact download.
+### `PATCH /programs/{id_or_slug}`
+
+Update program metadata. **Authentication required.**
+
+Owner-only fields: `public`, `name`, `tags`. Any authenticated user can set their own `slug`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `public` | boolean | Visibility (owner only). |
+| `name` | string | Display title, max 100 chars (owner only). |
+| `tags` | string[] | Tags, max 5 items (owner only). |
+| `slug` | string | URL-safe handle, 2-50 chars, `^[a-z0-9][a-z0-9-]*[a-z0-9]$`. Creates/replaces your alias for this program. |
+
+### `GET /programs/{id_or_slug}/download`
+
+Redirects to the Hugging Face CDN for the `.paw` artifact. Private programs return 404 to non-owners.
 
 ### `GET /programs/resolve/{slug}`
 
-Resolve a slug or alias to a canonical `program_id`.
+Resolve a slug (e.g. `da03/my-classifier` or bare `email-triage`) to a canonical `program_id`.
 
 ### `POST /programs/{id}/alias`
 
-Create an alias for the program. **Authentication required.**
-
-**Request body (JSON):**
+Create or update your alias for a program. **Authentication required.** If you already have an alias for this program, it is replaced (atomic update).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `slug` | string | Alias slug to register. |
+| `slug` | string | Slug name, 2-50 chars, lowercase alphanumeric and hyphens. |
 
-### `POST /programs/{id}/vote`
+### `POST /programs/{id_or_slug}/vote`
 
-Submit a vote for a program. **Authentication required.**
-
-**Request body (JSON):**
+Submit a vote. **Authentication required.**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `vote` | integer | `1` (up) or `-1` (down). |
+| `vote` | integer | `1` (upvote) or `-1` (downvote). Same value again removes the vote. |
 
 ### `GET /programs/{id}/cases` and `POST /programs/{id}/cases`
 
-Community feedback and case submission for a program. Method-specific payloads follow the server schema for each verb.
+Community case submission for a program.
 
 ### `GET /auth/github`
 

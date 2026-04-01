@@ -1,6 +1,6 @@
 # Naming Programs
 
-ProgramAsWeights uses two ways to refer to compiled programs: immutable content hashes and optional human-readable aliases.
+ProgramAsWeights uses two ways to refer to compiled programs: immutable content hashes and optional human-readable slugs.
 
 ## Content-addressable IDs
 
@@ -10,43 +10,69 @@ Every compiled program has a stable identifier derived from its contents, simila
 9b57fd6fccf77885400e
 ```
 
-You can load a program by this ID with `paw.function("<id>")` wherever you have the exact string.
+You can load a program by this ID with `paw.function("<id>")` wherever you have the exact string. Hash IDs never change and always work.
 
-## User aliases
+## Slugs (human-readable handles)
 
-Signed-in users may register aliases in `username/name` form, for example:
+Authenticated users can optionally assign a slug at compile time:
 
-```text
-yourname/my-classifier
+```python
+program = paw.compile(
+    "Classify message urgency as immediate or wait",
+    slug="message-classifier"
+)
+# Creates da03/message-classifier (username/slug)
 ```
 
-Aliases are unique per user: you cannot register two different programs both named `yourname/foo`.
+The slug creates a `username/slug` handle that works everywhere a hash ID works:
 
-Multiple aliases may point to the same underlying program (same content hash).
+```python
+fn = paw.function("da03/message-classifier")
+```
+
+Slugs are **never auto-generated**. If you don't provide one, your program is
+identified by hash only. This keeps the namespace clean for intentional naming.
+
+### Adding or changing a slug later
+
+You can add a slug to an existing program, or rename it:
+
+```bash
+paw rename a6b454023d41ac9ca845 message-classifier
+```
+
+Or via the API:
+
+```python
+import httpx
+httpx.patch(
+    "https://programasweights.com/api/v1/programs/a6b454023d41ac9ca845",
+    json={"slug": "message-classifier"},
+    headers={"X-API-Key": "paw_sk_..."}
+)
+```
 
 ## Official namespace
 
-Programs published under the `programasweights/` namespace are the official catalog. For these, the registry prefix may be omitted:
+Programs published under the `programasweights/` namespace are the official catalog. For these, the prefix may be omitted:
 
 - `paw.function("email-triage")` resolves to `programasweights/email-triage`.
 
 ## Community programs
 
-Programs published under a user or organization prefix must include that prefix when loading:
+Programs published under a user prefix must include that prefix:
 
 ```python
-paw.function("yourname/custom-filter")
+paw.function("da03/message-classifier")
 ```
-
-Omitting the prefix is only valid for official names in the `programasweights/` namespace.
 
 ## Authentication
 
-Creating or managing aliases requires signing in with GitHub on [programasweights.com](https://programasweights.com).
+Creating or managing slugs requires signing in with GitHub on [programasweights.com](https://programasweights.com).
 
 ## Convention
 
-This mirrors common package registries (for example Docker Hub and npm):
+This mirrors HuggingFace, Docker Hub, and npm:
 
-- Short names such as `nginx` refer to official images; `myuser/myapp` refers to community-published artifacts.
-- In PAW, `email-triage` behaves like an official short name; `username/name` behaves like a scoped community name.
+- Short names like `email-triage` refer to official programs (`programasweights/email-triage`).
+- `username/name` is for community programs, like `Qwen/Qwen3-0.6B` on HuggingFace.

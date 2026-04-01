@@ -7,7 +7,7 @@ ProgramAsWeights lets you define functions in English and compile them into tiny
 ## Quick Start
 
 ```bash
-pip install --pre programasweights
+pip install programasweights --extra-index-url https://pypi.programasweights.com/simple/
 ```
 
 ```python

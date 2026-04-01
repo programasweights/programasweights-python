@@ -21,8 +21,9 @@ API reference:
     paw.api_url                Server URL (default: https://programasweights.com)
     paw.api_key                API key (set via login() or PAW_API_KEY env var)
 """
+from __future__ import annotations
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 from .config import get_api_url, get_api_key, set_api_key
 

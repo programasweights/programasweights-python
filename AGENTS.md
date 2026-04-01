@@ -1,6 +1,6 @@
 # ProgramAsWeights (PAW)
 
-PAW compiles natural language specifications into tiny neural functions that run locally. Use it when you need fuzzy text processing — classification, extraction, format repair, search, triage — that regex can't handle but a full LLM is overkill for.
+PAW compiles natural language specifications into tiny neural functions that run locally. Each function takes a single text input and returns a single text output. Use it when you need fuzzy text processing — classification, extraction, format repair, search, triage — that regex can't handle but a full LLM is overkill for.
 
 Website: https://programasweights.com
 Docs: https://programasweights.readthedocs.io
@@ -17,6 +17,7 @@ pip install programasweights --extra-index-url https://pypi.programasweights.com
 import programasweights as paw
 
 # Use a pre-compiled function (downloads once, runs locally forever)
+# "email-triage" is an official pre-compiled program (slug)
 fn = paw.function("email-triage")
 fn("Urgent: server is down!")  # "immediate"
 fn("Newsletter: spring picnic")  # "wait"
@@ -28,6 +29,10 @@ program = paw.compile(
 )
 fn = paw.function(program.id)
 fn("{name: 'Alice',}")  # '{"name": "Alice"}'
+
+# Or compile and load in one step
+fn = paw.compile_and_load("Classify sentiment as positive or negative")
+fn("I love this!")  # "positive"
 ```
 
 ## Two Compilers
@@ -39,13 +44,46 @@ fn("{name: 'Alice',}")  # '{"name": "Alice"}'
 | Base model size | 594 MB | 105 MB |
 | Program size | ~22 MB | ~5 MB |
 | Inference speed | ~90ms (server) | ~50ms (server) |
-| Runs in browser | No | Yes |
+| Runs in browser | No | Yes (must use this compiler) |
 
-Default is Standard (Qwen3 0.6B). Use Compact (GPT-2) when you need smaller files or browser deployment.
+Default is Standard. Use Compact for smaller files or browser deployment.
+
+## When to Use PAW
+
+- **Fuzzy search** — typo-tolerant matching, semantic search, near-duplicate detection
+- **Format repair** — fix broken JSON, normalize dates, repair malformed inputs
+- **Classification** — sentiment, urgency, categories defined in your own words
+- **Extraction** — emails, names, dates from messy unstructured text
+- **Log triage** — extract errors from verbose output, filter noise
+- **Intent routing** — map user descriptions to the closest URL, menu item, or setting
+- **Agent preprocessing** — parse tool calls, validate outputs, route tasks
+
+## Writing Good Specs
+
+Description + examples. Use `Input: ... Output: ...` format.
+
+```python
+fn = paw.compile_and_load("""
+Classify user intent. Return ONLY one of: search, create, delete, other.
+
+Input: Find the latest report
+Output: search
+
+Input: Make a new folder
+Output: create
+
+Input: Remove old backups
+Output: delete
+""")
+```
+
+- State output constraints explicitly: "Return ONLY one of: X, Y, Z"
+- Each function is stateless: one input, one output. No conversation history.
+- Write a few test inputs with expected outputs, then try different spec phrasings and pick the one that passes the most.
 
 ## Browser / JavaScript SDK
 
-Programs compiled with GPT-2 also run entirely in the browser via WebAssembly — no server needed. Users' data never leaves their device.
+Programs compiled with `paw-4b-gpt2` run in the browser via WebAssembly.
 
 ```bash
 npm install @programasweights/web
@@ -59,45 +97,20 @@ const result = await fn('Urgent: server is down!');
 // result: "immediate"
 ```
 
-Use this when you want to offload all computation to the user's browser: zero server costs, zero API keys, full data privacy. The 105 MB base model downloads once and is cached.
-
-## When to Use PAW
-
-- **Fuzzy search** — typo-tolerant matching, semantic search, near-duplicate detection
-- **Format repair** — fix broken JSON, normalize dates, repair malformed inputs
-- **Classification** — sentiment, urgency, categories defined in your own words
-- **Extraction** — emails, names, dates from messy unstructured text
-- **Log triage** — extract errors from verbose output, filter noise
-- **Intent routing** — map user descriptions to the closest URL, menu item, or setting
-- **Agent preprocessing** — parse tool calls, validate outputs, route tasks
-
 ## Authentication (optional)
 
-Everything works without authentication. Sign in for higher rate limits and program naming.
+Sign in for higher rate limits and program naming. Everything works without it.
 
 ```bash
 export PAW_API_KEY=paw_sk_...
 ```
 
-Generate API keys at https://programasweights.com/settings. The SDK reads `PAW_API_KEY` from the environment automatically.
+Generate API keys at https://programasweights.com/settings.
 
 | | Anonymous | Authenticated |
 |---|---|---|
 | Compile rate limit | 20/hr | 60/hr |
 | Name programs (slugs) | No | Yes |
-
-## Program Naming
-
-Every compiled program gets an immutable hash ID (e.g. `a6b454023d41ac9ca845`). Authenticated users can also assign a human-readable slug:
-
-```python
-program = paw.compile("Classify sentiment", slug="my-classifier")
-# program.id   -> "a6b454023d41ac9ca845"
-# program.slug -> "da03/my-classifier"
-
-fn = paw.function("da03/my-classifier")  # by slug (requires auth to create)
-fn = paw.function("a6b454023d41ac9ca845") # by hash (always works)
-```
 
 ## CLI
 
@@ -109,21 +122,52 @@ paw rename <program_id> my-slug   # name a program (requires auth)
 paw login                         # save API key
 ```
 
-`--json` gives structured output for programmatic use.
+`--json` gives structured output. Example:
 
-## API
+```json
+{"program_id": "a6b454023d41ac9ca845", "slug": null, "status": "ready", "error": null, "timings": {"total_ms": 2800}}
+```
+
+## Full API Reference
 
 ```python
-paw.compile(spec)                 # compile (returns Program with .id)
-paw.function(program_id_or_slug)  # load for local inference
-paw.login()                       # save API key
+program = paw.compile(
+    spec,                               # natural language specification (str)
+    compiler="paw-4b-qwen3-0.6b",
+    slug=None,                          # URL-safe handle (requires auth)
+    public=True,                        # list on public hub
+)
+# Returns: Program(id, slug, status, timings, error)
+
+fn = paw.function(program)              # accepts Program object, hash ID, or slug
+fn = paw.function("a6b454023d41ac9ca845")
+fn = paw.function("da03/my-classifier")
+
+result: str = fn(input_text: str, max_tokens=512, temperature=0.0)
+
+fn = paw.compile_and_load(spec, compiler="paw-4b-qwen3-0.6b")
+
+programs = paw.list_programs(sort="recent", per_page=20)  # requires auth
+
+paw.login()
 ```
+
+## Common Errors
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `httpx.HTTPStatusError: 404` on download | Program still uploading to CDN | SDK retries automatically. If persistent, recompile. |
+| `httpx.HTTPStatusError: 422` on compile | Spec too short (<10 chars) | Adjust spec length. |
+| `httpx.HTTPStatusError: 429` | Rate limit exceeded | Wait, or sign in for higher limits. |
+
+## Performance
+
+- **First call** ~500ms (loads base model). Subsequent calls ~50-90ms.
+- **Base model shared** across functions. Each LoRA adapter adds ~22 MB.
+- **Thread-safe** and **blocking**.
+- **Cache**: `~/.cache/programasweights/`. Override with `PAW_CACHE_DIR`.
+- **Offline** after first download.
 
 ## Browse Programs
 
 https://programasweights.com/hub
-
-## Add PAW to Your Project
-
-Copy this file into your project as AGENTS.md:
-https://programasweights.com/agents

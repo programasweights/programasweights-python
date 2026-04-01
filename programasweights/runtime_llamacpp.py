@@ -53,12 +53,25 @@ class PawFunction:
         interpreter = self._meta.get("interpreter", "Qwen/Qwen3-0.6B")
         base_model_path = cache.get_base_model_path(interpreter)
 
-        self._llm = Llama(
-            model_path=str(base_model_path),
-            n_ctx=n_ctx,
-            n_gpu_layers=n_gpu_layers,
-            verbose=verbose,
-        )
+        if not verbose:
+            import os as _os, sys as _sys
+            _stderr_fd = _sys.stderr.fileno()
+            _devnull = _os.open(_os.devnull, _os.O_WRONLY)
+            _old_stderr = _os.dup(_stderr_fd)
+            _os.dup2(_devnull, _stderr_fd)
+
+        try:
+            self._llm = Llama(
+                model_path=str(base_model_path),
+                n_ctx=n_ctx,
+                n_gpu_layers=n_gpu_layers,
+                verbose=verbose,
+            )
+        finally:
+            if not verbose:
+                _os.dup2(_old_stderr, _stderr_fd)
+                _os.close(_devnull)
+                _os.close(_old_stderr)
 
         adapter_path = program_dir / "adapter.gguf"
         if adapter_path.exists():

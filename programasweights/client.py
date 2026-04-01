@@ -108,18 +108,25 @@ class PAWClient:
         """Download a .paw bundle to the local cache.
 
         Returns the path to the extracted program directory.
+        Retries on 404 since freshly compiled programs may still be uploading.
         """
         program_dir = config.get_programs_dir() / program_id
         if (program_dir / "prompt_template.txt").exists():
             return program_dir
 
-        resp = httpx.get(
-            f"{self._api_url}/api/v1/programs/{program_id}/download",
-            headers=self._headers(),
-            timeout=60.0,
-            follow_redirects=True,
-        )
-        resp.raise_for_status()
+        max_retries = 10
+        for attempt in range(max_retries):
+            resp = httpx.get(
+                f"{self._api_url}/api/v1/programs/{program_id}/download",
+                headers=self._headers(),
+                timeout=60.0,
+                follow_redirects=True,
+            )
+            if resp.status_code == 404 and attempt < max_retries - 1:
+                time.sleep(3)
+                continue
+            resp.raise_for_status()
+            break
 
         program_dir.mkdir(parents=True, exist_ok=True)
         paw_path = program_dir / f"{program_id}.paw"
@@ -134,6 +141,17 @@ class PAWClient:
         """Get program metadata from the server."""
         resp = httpx.get(
             f"{self._api_url}/api/v1/programs/{program_id}",
+            headers=self._headers(),
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def list_programs(self, sort: str = "recent", per_page: int = 20, page: int = 1) -> dict:
+        """List programs for the authenticated user."""
+        resp = httpx.get(
+            f"{self._api_url}/api/v1/programs",
+            params={"mine": "true", "sort": sort, "per_page": per_page, "page": page},
             headers=self._headers(),
             timeout=10.0,
         )

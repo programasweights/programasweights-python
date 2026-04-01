@@ -22,7 +22,7 @@ API reference:
     paw.api_key                API key (set via login() or PAW_API_KEY env var)
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 from .config import get_api_url, get_api_key, set_api_key
 
@@ -72,7 +72,7 @@ def compile(
 
 
 def function(
-    program_id: str,
+    program_id,
     n_ctx: int = 2048,
     n_gpu_layers: int | None = None,
     verbose: bool = False,
@@ -83,7 +83,7 @@ def function(
     Subsequent calls use the local cache.
 
     Args:
-        program_id: The program ID from ``paw.compile()``.
+        program_id: Program ID (str), slug, or a ``Program`` object from compile().
         n_ctx: Context window size for llama.cpp.
         n_gpu_layers: GPU layers (-1 = all, 0 = CPU only). Defaults to CPU.
             Set ``PAW_GPU_LAYERS`` env var or pass explicitly for GPU acceleration.
@@ -96,7 +96,12 @@ def function(
         >>> fn = paw.function("email-triage")
         >>> fn("Urgent: the server is down!")
         'immediate'
+
+        >>> program = paw.compile("Classify sentiment")
+        >>> fn = paw.function(program)  # accepts Program object directly
     """
+    if hasattr(program_id, 'id'):
+        program_id = program_id.slug or program_id.id
     import os
     import re
     from .cache import is_program_cached, get_program_dir, get_cached_slug, save_slug_mapping
@@ -175,9 +180,60 @@ def login(key: str | None = None):
     print("You can also set the PAW_API_KEY environment variable.")
 
 
+def compile_and_load(
+    spec: str,
+    compiler: str = "paw-4b-qwen3-0.6b",
+    n_ctx: int = 2048,
+    n_gpu_layers: int | None = None,
+    verbose: bool = False,
+    **compile_kwargs,
+):
+    """Compile a spec and immediately load it for local inference.
+
+    Convenience wrapper that combines ``paw.compile()`` and ``paw.function()``
+    into a single call.
+
+    Args:
+        spec: Natural language specification.
+        compiler: Compiler model name.
+        n_ctx: Context window size for llama.cpp.
+        n_gpu_layers: GPU layers (-1 = all, 0 = CPU only).
+        verbose: Print llama.cpp debug output.
+        **compile_kwargs: Additional args passed to compile (slug, public, etc.)
+
+    Returns:
+        A callable ``PawFunction``.
+
+    Example:
+        >>> fn = paw.compile_and_load("Classify sentiment as positive or negative")
+        >>> fn("I love this!")
+        'positive'
+    """
+    program = compile(spec, compiler=compiler, **compile_kwargs)
+    return function(program, n_ctx=n_ctx, n_gpu_layers=n_gpu_layers, verbose=verbose)
+
+
+def list_programs(sort: str = "recent", per_page: int = 20, page: int = 1) -> dict:
+    """List your compiled programs. Requires authentication (PAW_API_KEY).
+
+    Returns:
+        Dict with ``programs`` (list), ``total``, ``page``, ``per_page``.
+
+    Example:
+        >>> programs = paw.list_programs()
+        >>> for p in programs["programs"]:
+        ...     print(p["id"], p["name"])
+    """
+    from .client import PAWClient
+    client = PAWClient(api_url=api_url, api_key=api_key)
+    return client.list_programs(sort=sort, per_page=per_page, page=page)
+
+
 __all__ = [
     "compile",
+    "compile_and_load",
     "function",
+    "list_programs",
     "login",
     "api_url",
     "api_key",

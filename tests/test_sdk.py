@@ -442,3 +442,85 @@ class TestCLIRename:
         assert result.returncode == 0
         data = json.loads(result.stdout)
         assert data.get("program_id")
+
+
+# ── Phase 12: New convenience methods ──
+
+
+class TestCompileAndLoad:
+    def test_compile_and_load_returns_callable(self):
+        fn = paw.compile_and_load("Classify text as positive or negative sentiment.")
+        assert callable(fn)
+        result = fn("I love this product!")
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_compile_and_load_with_compiler(self):
+        fn = paw.compile_and_load(
+            "Count the vowels in the input. Return just the number.",
+            compiler="paw-4b-qwen3-0.6b",
+        )
+        result = fn("hello")
+        assert isinstance(result, str)
+
+
+class TestFunctionAcceptsProgram:
+    def test_function_with_program_object(self):
+        program = paw.compile("Classify text as positive or negative sentiment.")
+        fn = paw.function(program)
+        assert callable(fn)
+        result = fn("Great product!")
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_function_with_string_still_works(self):
+        fn = paw.function("email-triage")
+        assert callable(fn)
+
+
+class TestListPrograms:
+    @needs_auth
+    def test_list_programs_returns_dict(self):
+        old_key = paw.api_key
+        try:
+            paw.api_key = API_KEY
+            result = paw.list_programs()
+            assert isinstance(result, dict)
+            assert "programs" in result
+            assert "total" in result
+            assert isinstance(result["programs"], list)
+        finally:
+            paw.api_key = old_key
+
+    @needs_auth
+    def test_list_programs_has_entries(self):
+        old_key = paw.api_key
+        try:
+            paw.api_key = API_KEY
+            result = paw.list_programs(per_page=5)
+            assert len(result["programs"]) <= 5
+            if result["programs"]:
+                p = result["programs"][0]
+                assert "id" in p
+                assert "spec" in p
+        finally:
+            paw.api_key = old_key
+
+
+class TestStderrSuppression:
+    def test_no_stderr_by_default(self):
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import programasweights as paw; fn = paw.function('email-triage'); fn('test')"],
+            capture_output=True, text=True, timeout=120,
+        )
+        assert "n_ctx_seq" not in result.stderr
+        assert "llama_context" not in result.stderr
+
+    def test_stderr_with_verbose(self):
+        result = subprocess.run(
+            [sys.executable, "-c",
+             "import programasweights as paw; fn = paw.function('email-triage', verbose=True); fn('test')"],
+            capture_output=True, text=True, timeout=120,
+        )
+        assert result.returncode == 0

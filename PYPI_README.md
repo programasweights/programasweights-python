@@ -28,6 +28,10 @@ program = paw.compile(
 )
 fn = paw.function(program.slug)    # or paw.function(program.id)
 fn("{name: 'Alice',}")  # '{"name": "Alice"}'
+
+# Or compile and load in one step
+fn = paw.compile_and_load("Classify sentiment as positive or negative")
+fn("I love this!")  # "positive"
 ```
 
 ## Two Compilers

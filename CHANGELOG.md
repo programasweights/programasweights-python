@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2 (2026-03-19)
+
+- Add `paw.compile_and_load()` convenience method (compile + load in one call)
+- `paw.function()` now accepts a `Program` object directly (not just string ID)
+- Add `paw.list_programs()` for authenticated users to list their programs
+- Suppress `llama.cpp` stderr noise by default; use `verbose=True` to enable
+- Rewritten AGENTS.md with spec-writing tips, full API reference, common errors, and performance notes
+
 ## 0.2.0 (2026-04-01)
 
 First public release.

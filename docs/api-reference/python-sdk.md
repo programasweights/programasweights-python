@@ -24,7 +24,7 @@ Loads a compiled program and returns a callable. Downloads the program and base 
 
 | Parameter | Description |
 |-----------|-------------|
-| `name_or_id` | Program hash ID (e.g. `a6b454023d41ac9ca845`), slug (e.g. `da03/my-classifier`), or official shorthand (e.g. `email-triage`). |
+| `name_or_id` | A `Program` object, hash ID (e.g. `a6b454023d41ac9ca845`), slug (e.g. `da03/my-classifier`), or official shorthand (e.g. `email-triage`). |
 | `n_ctx` | Context length for the local runtime (default `2048`). |
 | `n_gpu_layers` | GPU layers to offload (`0` = CPU-only, `-1` = all). Set `PAW_GPU_LAYERS` env var as default. |
 | `verbose` | Enable verbose logging (default `False`). |
@@ -75,6 +75,36 @@ Compiles a natural language spec on the server. Returns a `Program` object.
 | `compiler_snapshot` | Exact compiler version used. |
 | `timings` | Timing metadata from the server. |
 | `error` | Error message when compilation fails. |
+
+## `paw.compile_and_load`
+
+```python
+fn = paw.compile_and_load(spec, compiler="paw-4b-qwen3-0.6b", **kwargs)
+```
+
+Convenience method that compiles a spec and immediately loads the result for local inference. Equivalent to `paw.function(paw.compile(spec, ...).id)`. Returns a callable.
+
+Accepts all the same parameters as `paw.compile`.
+
+## `paw.list_programs`
+
+```python
+result = paw.list_programs(sort="recent", per_page=20)
+```
+
+Returns a dict with the authenticated user's compiled programs. Requires authentication.
+
+| Parameter | Description |
+|-----------|-------------|
+| `sort` | Sort order: `"recent"` (default), `"votes"`, `"recommended"`. |
+| `per_page` | Number of results per page (default `20`). |
+
+**Return value** -- dict:
+
+| Key | Description |
+|-----|-------------|
+| `programs` | List of program dicts with `id`, `spec`, `name`, `compiler`, etc. |
+| `total` | Total number of programs. |
 
 ## `paw.login`
 

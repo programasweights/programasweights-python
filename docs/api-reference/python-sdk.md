@@ -32,16 +32,16 @@ Loads a compiled program and returns a callable. Downloads the program and base 
 The returned callable:
 
 ```python
-output: str = fn(input_text, max_tokens=512, temperature=0.0)
+output: str = fn(input_text, max_tokens=None, temperature=0.0)
 ```
 
 | Parameter | Description |
 |-----------|-------------|
 | `input_text` | Input string for the program. |
-| `max_tokens` | Maximum tokens to generate (default `512`). |
+| `max_tokens` | Maximum tokens to generate. `None` (default) = use all remaining context window. |
 | `temperature` | Sampling temperature (default `0.0`). |
 
-**Context limits:** Spec + input + output share a ~2048 token window. Inputs exceeding the window will error (not silently truncated). Setting `max_tokens` high is safe -- generation stops at EOS or when the window is full.
+**Context limits:** Spec + input + output share a ~2048 token window. If input + output together exceed the window, generation will error. For short inputs, high `max_tokens` is safe (stops at EOS). For long inputs, set `max_tokens` conservatively.
 
 ## `paw.compile`
 

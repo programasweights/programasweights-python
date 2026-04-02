@@ -158,7 +158,7 @@ fn = paw.function(program)              # accepts Program object, hash ID, or sl
 fn = paw.function("a6b454023d41ac9ca845")
 fn = paw.function("da03/my-classifier")
 
-result: str = fn(input_text: str, max_tokens=512, temperature=0.0)
+result: str = fn(input_text: str, max_tokens=None, temperature=0.0)
 
 fn = paw.compile_and_load(spec, compiler="paw-4b-qwen3-0.6b")
 

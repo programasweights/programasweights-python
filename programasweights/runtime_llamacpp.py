@@ -37,6 +37,7 @@ class PawFunction:
         program_dir = Path(program_dir)
         self._program_dir = program_dir
         self._verbose = verbose
+        self._n_ctx = n_ctx
 
         meta_path = program_dir / "meta.json"
         if meta_path.exists():
@@ -151,20 +152,19 @@ class PawFunction:
     def __call__(
         self,
         input_text: str,
-        max_tokens: int = 512,
+        max_tokens: int | None = None,
         temperature: float = 0.0,
     ) -> str:
         """Run the program on an input.
 
         Args:
             input_text: The input to process.
-            max_tokens: Maximum output tokens.
+            max_tokens: Maximum output tokens. None = use all remaining context.
             temperature: Sampling temperature (0 = greedy).
 
         Returns:
             The program's output as a string.
         """
-        # Reset to prefix state: clear everything after the prefix
         self._llm.n_tokens = self._n_prefix
 
         input_with_suffix = input_text + self._suffix_text
@@ -174,10 +174,21 @@ class PawFunction:
             special=self._use_special,
         )
 
+        tokens_used = self._n_prefix + len(input_tokens)
+        remaining = self._n_ctx - tokens_used
+        if remaining <= 0:
+            raise ValueError(
+                f"Input too long: {tokens_used} tokens used (prefix={self._n_prefix}, "
+                f"input={len(input_tokens)}), context window={self._n_ctx}. "
+                f"Shorten your input."
+            )
+
+        gen_limit = remaining if max_tokens is None else min(max_tokens, remaining)
+
         self._llm.eval(input_tokens)
 
         output_tokens = []
-        for _ in range(max_tokens):
+        for _ in range(gen_limit):
             token = self._llm.sample(
                 temp=temperature if temperature > 0 else 0,
             )

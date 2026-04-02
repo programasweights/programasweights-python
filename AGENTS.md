@@ -156,7 +156,7 @@ paw.login()
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `httpx.HTTPStatusError: 404` on download | Program still uploading to CDN | SDK retries automatically. If persistent, recompile. |
+| `RuntimeError: assets not ready` on download | Program still generating after compile | SDK polls automatically for up to 30s. If persistent, recompile. |
 | `httpx.HTTPStatusError: 422` on compile | Spec too short (<10 chars) | Adjust spec length. |
 | `httpx.HTTPStatusError: 429` | Rate limit exceeded | Wait, or sign in for higher limits. |
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.4 (2026-04-01)
+
+- Download reliability: asset endpoints return 202 Retry-After when program is still generating, eliminating 404 race conditions
+- Guard local cleanup on HF upload success: files persist locally if upload fails
+- Stderr suppression now covers LoRA adapter loading (fixes CPU_REPACK warnings on 0.2.3)
+- Browser: fix LoRA switching bug (free old adapter + clear KV before loading new program)
+
+## 0.2.3 (2026-04-01)
+
+- Python 3.9 compatibility fix (`from __future__ import annotations`)
+
 ## 0.2.2 (2026-03-19)
 
 - Add `paw.compile_and_load()` convenience method (compile + load in one call)

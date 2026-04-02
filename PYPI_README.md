@@ -18,7 +18,7 @@ import programasweights as paw
 # Use a pre-compiled function (downloads once, runs locally forever)
 fn = paw.function("email-triage")
 fn("Urgent: the server is down!")        # "immediate"
-fn("Newsletter: spring picnic")          # "wait"
+fn("Newsletter: spring picnic")          # "can wait"
 
 # Compile your own from a description
 program = paw.compile(

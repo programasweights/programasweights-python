@@ -20,7 +20,7 @@ result = fn("Thesis defense committee needs your signature by EOD")
 print(result)  # "immediate"
 
 result = fn("Department newsletter: spring picnic next Friday")
-print(result)  # "wait"
+print(result)  # "can wait"
 ```
 
 ## Compile Your Own

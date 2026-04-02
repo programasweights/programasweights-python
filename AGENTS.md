@@ -81,6 +81,21 @@ Output: delete
 - Each function is stateless: one input, one output. No conversation history.
 - Write a few test inputs with expected outputs, then try different spec phrasings and pick the one that passes the most.
 
+## Chaining Functions
+
+Multiple PAW functions can be composed for multi-step tasks:
+
+```python
+classifier = paw.compile_and_load("Classify the bug type. Return ONLY one of: off-by-one, type-error, other")
+fixer = paw.compile_and_load("Fix the bug described in the first line. Return only the corrected code.")
+
+label = classifier(code_snippet)
+if label != "other":
+    fix = fixer(f"{label}: {code_snippet}")
+```
+
+Each function is independent -- chain them with regular Python logic.
+
 ## Browser / JavaScript SDK
 
 Programs compiled with `paw-4b-gpt2` run in the browser via WebAssembly.
@@ -167,6 +182,11 @@ paw.login()
 - **Thread-safe** and **blocking**.
 - **Cache**: `~/.cache/programasweights/`. Override with `PAW_CACHE_DIR`.
 - **Offline** after first download.
+
+## Limits
+
+- Spec + input + output share a ~2048 token context window, and inputs that exceed the context window will error out (not silently truncated).
+- Setting `max_tokens` high is safe -- generation stops at EOS or when the window is full.
 
 ## Browse Programs
 

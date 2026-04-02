@@ -41,6 +41,8 @@ output: str = fn(input_text, max_tokens=512, temperature=0.0)
 | `max_tokens` | Maximum tokens to generate (default `512`). |
 | `temperature` | Sampling temperature (default `0.0`). |
 
+**Context limits:** Spec + input + output share a ~2048 token window. Inputs exceeding the window will error (not silently truncated). Setting `max_tokens` high is safe -- generation stops at EOS or when the window is full.
+
 ## `paw.compile`
 
 ```python

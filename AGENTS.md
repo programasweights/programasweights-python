@@ -3,7 +3,7 @@
 PAW compiles natural language specifications into tiny neural functions that run locally. Each function takes a single text input and returns a single text output. Use it when you need fuzzy text processing — classification, extraction, format repair, search, triage — that regex can't handle but a full LLM is overkill for.
 
 Website: https://programasweights.com
-Docs: https://programasweights.readthedocs.io
+Full documentation: https://programasweights.readthedocs.io
 
 ## Install
 
@@ -185,8 +185,8 @@ paw.login()
 
 ## Limits
 
-- Spec + input + output share a ~2048 token context window, and inputs that exceed the context window will error out (not silently truncated).
-- Setting `max_tokens` high is safe -- generation stops at EOS or when the window is full.
+- Spec + input + output share a ~2048 token context window. Inputs that exceed it will error.
+- `max_tokens` defaults to `None`: generation runs until EOS or the context limit.
 
 ## Browse Programs
 

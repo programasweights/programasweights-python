@@ -108,25 +108,38 @@ class PAWClient:
         """Download a .paw bundle to the local cache.
 
         Returns the path to the extracted program directory.
-        Retries on 404 since freshly compiled programs may still be uploading.
+        Handles 202 Accepted (assets still generating) and 302 redirects (HF CDN).
         """
         program_dir = config.get_programs_dir() / program_id
         if (program_dir / "prompt_template.txt").exists():
             return program_dir
 
-        max_retries = 10
-        for attempt in range(max_retries):
+        max_wait = 30
+        elapsed = 0
+        resp = None
+        while elapsed < max_wait:
             resp = httpx.get(
                 f"{self._api_url}/api/v1/programs/{program_id}/download",
                 headers=self._headers(),
                 timeout=60.0,
                 follow_redirects=True,
             )
-            if resp.status_code == 404 and attempt < max_retries - 1:
+            if resp.status_code == 202:
+                retry_after = int(resp.headers.get("Retry-After", "3"))
+                time.sleep(retry_after)
+                elapsed += retry_after
+                continue
+            if resp.status_code == 404 and elapsed < max_wait - 3:
                 time.sleep(3)
+                elapsed += 3
                 continue
             resp.raise_for_status()
             break
+        else:
+            raise RuntimeError(
+                f"Program {program_id} assets not ready after {max_wait}s. "
+                "The program may still be generating. Try again shortly."
+            )
 
         program_dir.mkdir(parents=True, exist_ok=True)
         paw_path = program_dir / f"{program_id}.paw"

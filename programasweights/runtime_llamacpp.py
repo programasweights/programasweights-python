@@ -67,23 +67,23 @@ class PawFunction:
                 n_gpu_layers=n_gpu_layers,
                 verbose=verbose,
             )
+
+            adapter_path = program_dir / "adapter.gguf"
+            if adapter_path.exists():
+                self._adapter = llama_cpp.llama_adapter_lora_init(
+                    self._llm.model, str(adapter_path).encode("utf-8"),
+                )
+                if self._adapter:
+                    llama_cpp.llama_set_adapter_lora(self._llm.ctx, self._adapter, 1.0)
+                else:
+                    raise RuntimeError(f"Failed to load LoRA adapter: {adapter_path}")
+            else:
+                self._adapter = None
         finally:
             if not verbose:
                 _os.dup2(_old_stderr, _stderr_fd)
                 _os.close(_devnull)
                 _os.close(_old_stderr)
-
-        adapter_path = program_dir / "adapter.gguf"
-        if adapter_path.exists():
-            self._adapter = llama_cpp.llama_adapter_lora_init(
-                self._llm.model, str(adapter_path).encode("utf-8"),
-            )
-            if self._adapter:
-                llama_cpp.llama_set_adapter_lora(self._llm.ctx, self._adapter, 1.0)
-            else:
-                raise RuntimeError(f"Failed to load LoRA adapter: {adapter_path}")
-        else:
-            self._adapter = None
 
         placeholder = "{INPUT_PLACEHOLDER}"
         self._use_special = interpreter not in ("gpt2",)

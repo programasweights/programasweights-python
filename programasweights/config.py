@@ -28,6 +28,10 @@ def _save_config(config: dict):
     _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     with open(_CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=2)
+    try:
+        os.chmod(_CONFIG_FILE, 0o600)
+    except OSError:
+        pass
 
 
 def get_api_url() -> str:

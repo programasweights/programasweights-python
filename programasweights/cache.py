@@ -4,7 +4,7 @@ Local cache management for base models and compiled programs.
 Cache structure:
     ~/.cache/programasweights/
         base_models/
-            qwen3-0.6b-q6_k.gguf      # ~623 MB, downloaded once
+            qwen3-0.6b-q6_k.gguf      # ~594 MB, downloaded once
         programs/
             <program_id>/
                 adapter.gguf            # ~23 MB, Q4_0 LoRA
@@ -72,21 +72,27 @@ def is_program_cached(program_id: str) -> bool:
 
 
 def _download_file(url: str, dest: Path):
-    """Download a file with progress indication."""
+    """Download a file atomically with progress indication."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with httpx.stream("GET", url, follow_redirects=True, timeout=300.0) as resp:
-        resp.raise_for_status()
-        total = int(resp.headers.get("content-length", 0))
-        downloaded = 0
-        with open(dest, "wb") as f:
-            for chunk in resp.iter_bytes(chunk_size=8192):
-                f.write(chunk)
-                downloaded += len(chunk)
-                if total > 0:
-                    pct = downloaded / total * 100
-                    mb = downloaded / 1024 / 1024
-                    print(f"\r  {mb:.1f} MB ({pct:.0f}%)", end="", flush=True)
-        print()
+    tmp = dest.with_suffix(dest.suffix + ".tmp")
+    try:
+        with httpx.stream("GET", url, follow_redirects=True, timeout=300.0) as resp:
+            resp.raise_for_status()
+            total = int(resp.headers.get("content-length", 0))
+            downloaded = 0
+            with open(tmp, "wb") as f:
+                for chunk in resp.iter_bytes(chunk_size=8192):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total > 0:
+                        pct = downloaded / total * 100
+                        mb = downloaded / 1024 / 1024
+                        print(f"\r  {mb:.1f} MB ({pct:.0f}%)", end="", flush=True)
+            print()
+        os.replace(str(tmp), str(dest))
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _slug_cache_path() -> Path:

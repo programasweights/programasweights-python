@@ -6,7 +6,7 @@ Handles compilation, program download, and authentication.
 
 from __future__ import annotations
 
-import json
+import os
 import time
 import zipfile
 from dataclasses import dataclass
@@ -129,10 +129,17 @@ class PAWClient:
                 time.sleep(retry_after)
                 elapsed += retry_after
                 continue
-            if resp.status_code == 404 and elapsed < max_wait - 3:
-                time.sleep(3)
-                elapsed += 3
-                continue
+            if resp.status_code == 404:
+                try:
+                    detail = resp.json().get("detail", "")
+                except Exception:
+                    detail = resp.text
+                if "not found" in detail.lower():
+                    raise RuntimeError(f"Program {program_id} not found on server.")
+                if elapsed < max_wait - 3:
+                    time.sleep(3)
+                    elapsed += 3
+                    continue
             resp.raise_for_status()
             break
         else:
@@ -143,9 +150,14 @@ class PAWClient:
 
         program_dir.mkdir(parents=True, exist_ok=True)
         paw_path = program_dir / f"{program_id}.paw"
-        paw_path.write_bytes(resp.content)
+        tmp_path = paw_path.with_suffix(".paw.tmp")
+        tmp_path.write_bytes(resp.content)
+        os.replace(str(tmp_path), str(paw_path))
 
         with zipfile.ZipFile(paw_path) as zf:
+            for member in zf.namelist():
+                if os.path.isabs(member) or ".." in member.split("/"):
+                    raise ValueError(f"Unsafe path in .paw archive: {member}")
             zf.extractall(program_dir)
 
         return program_dir
@@ -170,13 +182,3 @@ class PAWClient:
         )
         resp.raise_for_status()
         return resp.json()
-
-
-_default_client: PAWClient | None = None
-
-
-def get_client() -> PAWClient:
-    global _default_client
-    if _default_client is None:
-        _default_client = PAWClient()
-    return _default_client

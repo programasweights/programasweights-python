@@ -18,18 +18,18 @@ API reference:
     paw.compile(spec)          Compile a spec on the server, returns Program
     paw.function(program_id)   Load a compiled program for local inference
     paw.login()                Save API key for higher rate limits
-    paw.api_url                Server URL (default: https://programasweights.com)
-    paw.api_key                API key (set via login() or PAW_API_KEY env var)
+    paw.get_api_url()          Server URL (default: https://programasweights.com)
+    paw.get_api_key()          API key (set via login() or PAW_API_KEY env var)
 """
 from __future__ import annotations
 
-__version__ = "0.2.5"
+try:
+    from importlib.metadata import version as _meta_version
+    __version__ = _meta_version("programasweights")
+except Exception:
+    __version__ = "0.2.5"
 
 from .config import get_api_url, get_api_key, set_api_key
-
-# Module-level settings
-api_url: str = get_api_url()
-api_key: str | None = get_api_key()
 
 
 def compile(
@@ -68,7 +68,7 @@ def compile(
         '{"name": "Alice"}'
     """
     from .client import PAWClient
-    client = PAWClient(api_url=api_url, api_key=api_key)
+    client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
     return client.compile(spec, compiler=compiler, name=name, tags=tags, public=public, slug=slug)
 
 
@@ -118,13 +118,13 @@ def function(
             resolved_id = cached
         else:
             from .client import PAWClient
-            client = PAWClient(api_url=api_url, api_key=api_key)
+            client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
             resolved_id = client.resolve_slug(program_id)
             save_slug_mapping(program_id, resolved_id)
 
     if not is_program_cached(resolved_id):
         from .client import PAWClient
-        client = PAWClient(api_url=api_url, api_key=api_key)
+        client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
         client.download_paw(resolved_id)
 
     program_dir = get_program_dir(resolved_id)
@@ -154,7 +154,7 @@ def login(key: str | None = None):
         API key saved.
     """
     if key is None:
-        settings_url = api_url.rstrip("/") + "/settings"
+        settings_url = get_api_url().rstrip("/") + "/settings"
         print(f"Generate an API key at {settings_url}")
         try:
             import webbrowser
@@ -173,9 +173,6 @@ def login(key: str | None = None):
         print("Warning: key doesn't start with 'paw_sk_'. Saving anyway.")
 
     set_api_key(key)
-
-    global api_key
-    api_key = key
 
     print("API key saved to ~/.config/programasweights/config.json")
     print("You can also set the PAW_API_KEY environment variable.")
@@ -226,7 +223,7 @@ def list_programs(sort: str = "recent", per_page: int = 20, page: int = 1) -> di
         ...     print(p["id"], p["name"])
     """
     from .client import PAWClient
-    client = PAWClient(api_url=api_url, api_key=api_key)
+    client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
     return client.list_programs(sort=sort, per_page=per_page, page=page)
 
 
@@ -236,7 +233,8 @@ __all__ = [
     "function",
     "list_programs",
     "login",
-    "api_url",
-    "api_key",
+    "get_api_url",
+    "get_api_key",
+    "set_api_key",
     "__version__",
 ]

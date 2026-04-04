@@ -37,16 +37,8 @@ fn("I love this!")  # "positive"
 
 ## Two Compilers
 
-| | Standard (Qwen3 0.6B) | Compact (GPT-2 124M) |
-|---|---|---|
-| Compiler name | `paw-4b-qwen3-0.6b` | `paw-4b-gpt2` |
-| Accuracy | Higher | Lower |
-| Base model size | 594 MB | 105 MB |
-| Program size | ~22 MB | ~5 MB |
-| Inference speed | ~90ms (server) | ~50ms (server) |
-| Runs in browser | No | Yes (must use this compiler) |
-
-Default is Standard. Use Compact for smaller files or browser deployment.
+- **Standard** (`paw-4b-qwen3-0.6b`) — higher accuracy, 594 MB base + ~22 MB/program. Default.
+- **Compact** (`paw-4b-gpt2`) — smaller (105 MB base + ~5 MB/program), runs in browser via WebAssembly.
 
 ## When to Use PAW
 
@@ -60,7 +52,9 @@ Default is Standard. Use Compact for smaller files or browser deployment.
 
 ## Writing Good Specs
 
-Description + examples. Use `Input: ... Output: ...` format.
+**The #1 practice: iterate with test cases.** Do not accept low performance on the first try. Build a test suite of input/output pairs, measure accuracy, then iteratively adjust wording and formatting until performance is good enough. Treat spec writing like software engineering: test, debug specific failures, fix the wording, retest.
+
+A good spec has a description plus `Input: ... Output: ...` examples.
 
 ```python
 fn = paw.compile_and_load("""
@@ -77,9 +71,14 @@ Output: delete
 """)
 ```
 
-- State output constraints explicitly if any: "Return ONLY one of: X, Y, Z"
-- Each function is stateless: one input, one output. No conversation history.
-- Write a few test inputs with expected outputs, then try different spec phrasings and pick the one that passes the most.
+**Spec-tuning tips:**
+
+- Each function is stateless: one text input, one text output. No conversation history.
+- **State output constraints explicitly**: "Return ONLY one of: X, Y, Z". Without this the model may produce free-form text.
+- **Include examples from your actual data**: Examples consistently outperform prose-only descriptions.
+- **Keep specs short**: The small model gets confused by long, verbose instructions. Be concise.
+- **Be specific about the role**: "You are an urgency detector for support tickets" outperforms generic "You are a classifier".
+- **Debug failures before sweeping**: Look at specific failing examples and understand WHY before trying many variants.
 
 ## Chaining Functions
 
@@ -94,7 +93,35 @@ if label != "other":
     fix = fixer(f"{label}: {code_snippet}")
 ```
 
-Each function is independent -- chain them with regular Python logic.
+Chain them with regular Python logic.
+
+## Event-Driven Monitoring
+
+PAW functions can classify log output. Compile once with examples from your specific logs, then reuse the function locally forever:
+
+```python
+program = paw.compile("""
+Classify log lines. Return ONLY one word: ALERT or QUIET.
+
+Input: [step 100] loss=0.05 lr=0.0001
+Output: QUIET
+
+Input: [Checkpoint] Saved model at step 1000
+Output: ALERT
+
+Input: Traceback (most recent call last):
+Output: ALERT
+
+Input: Training complete. Final loss: 0.11
+Output: ALERT
+""")
+
+fn = paw.function(program.id)  # reuse with saved program.id
+fn("[step 200] loss=0.04")           # "QUIET"
+fn("[Checkpoint] Saved model")       # "ALERT"
+```
+
+Full tool with file watching, truncation, and stall detection: [examples/paw_monitor.py](https://github.com/programasweights/programasweights-python/blob/main/examples/paw_monitor.py)
 
 ## Browser / JavaScript SDK
 
@@ -129,19 +156,7 @@ Generate API keys at https://programasweights.com/settings.
 
 ## CLI
 
-```bash
-paw compile --spec "Classify sentiment" --json
-paw run --program <program_id> --input "I love this!" --json
-paw info <program_id>             # show program metadata
-paw rename <program_id> my-slug   # name a program (requires auth)
-paw login                         # save API key
-```
-
-`--json` gives structured output. Example:
-
-```json
-{"program_id": "a6b454023d41ac9ca845", "slug": null, "status": "ready", "error": null, "timings": {"total_ms": 2800}}
-```
+Commands: `paw compile --spec "..." --json`, `paw run --program <id> --input "..."`, `paw info <id>`, `paw rename <id> <slug>`, `paw login`. All support `--json` for structured output.
 
 ## Full API Reference
 
@@ -177,9 +192,8 @@ paw.login()
 
 ## Performance
 
-- **First call** ~500ms (loads base model). Subsequent calls ~50-90ms.
-- **Base model shared** across functions. Each LoRA adapter adds ~22 MB.
-- **Thread-safe** and **blocking**.
+- **First call** ~5-15s (loads base model). Subsequent calls 0.5-5s depending on input length.
+- **Base model shared** across functions on disk. Each LoRA adapter adds ~22 MB.
 - **Cache**: `~/.cache/programasweights/`. Override with `PAW_CACHE_DIR`.
 - **Offline** after first download.
 
@@ -188,6 +202,3 @@ paw.login()
 - Spec + input + output share a ~2048 token context window. Inputs that exceed it will error.
 - `max_tokens` defaults to `None`: generation runs until EOS or the context limit.
 
-## Browse Programs
-
-https://programasweights.com/hub

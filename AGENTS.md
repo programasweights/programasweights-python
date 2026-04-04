@@ -75,9 +75,7 @@ Output: delete
 
 - Each function is stateless: one text input, one text output. No conversation history.
 - **State output constraints explicitly**: "Return ONLY one of: X, Y, Z". Without this the model may produce free-form text.
-- **Include examples from your actual data**: Examples consistently outperform prose-only descriptions.
-- **Keep specs short**: The small model gets confused by long, verbose instructions. Be concise.
-- **Be specific about the role**: "You are an urgency detector for support tickets" outperforms generic "You are a classifier".
+- **Include examples from your actual data**: Examples outperform prose-only descriptions.
 - **Debug failures before sweeping**: Look at specific failing examples and understand WHY before trying many variants.
 
 ## Chaining Functions

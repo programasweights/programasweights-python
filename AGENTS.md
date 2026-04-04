@@ -93,6 +93,10 @@ if label != "other":
 
 Chain them with regular Python logic.
 
+## Case Studies
+
+Production examples with iterative spec-tuning walkthroughs: [site navigation](https://programasweights.readthedocs.io/case-studies/site-navigation/) (5-program pipeline, Cmd+K helper) and [semantic search](https://programasweights.readthedocs.io/case-studies/semantic-search/) (reranking without a vector database).
+
 ## Event-Driven Monitoring
 
 PAW functions can classify log output. Compile once with examples from your specific logs, then reuse the function locally forever:

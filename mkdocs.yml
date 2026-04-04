@@ -51,6 +51,9 @@ nav:
     - Browsing Programs: hub/browsing-programs.md
     - Publishing Programs: hub/publishing-programs.md
     - Feedback & Cases: hub/feedback-cases.md
+  - Case Studies:
+    - Site Navigation: case-studies/site-navigation.md
+    - Semantic Search: case-studies/semantic-search.md
   - Advanced:
     - Architecture: advanced/architecture.md
     - Architecture Decision Records: advanced/adrs.md

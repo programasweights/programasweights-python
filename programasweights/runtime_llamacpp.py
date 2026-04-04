@@ -70,16 +70,14 @@ class PawFunction:
             )
 
             adapter_path = program_dir / "adapter.gguf"
-            if adapter_path.exists():
-                self._adapter = llama_cpp.llama_adapter_lora_init(
-                    self._llm.model, str(adapter_path).encode("utf-8"),
-                )
-                if self._adapter:
-                    self._apply_adapter(1.0)
-                else:
-                    raise RuntimeError(f"Failed to load LoRA adapter: {adapter_path}")
-            else:
-                self._adapter = None
+            if not adapter_path.exists():
+                raise FileNotFoundError(f"LoRA adapter not found: {adapter_path}")
+            self._adapter = llama_cpp.llama_adapter_lora_init(
+                self._llm.model, str(adapter_path).encode("utf-8"),
+            )
+            if self._adapter is None:
+                raise RuntimeError(f"Failed to load LoRA adapter: {adapter_path}")
+            self._apply_adapter(1.0)
         finally:
             if not verbose:
                 _os.dup2(_old_stderr, _stderr_fd)

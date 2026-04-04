@@ -75,7 +75,7 @@ class PawFunction:
                     self._llm.model, str(adapter_path).encode("utf-8"),
                 )
                 if self._adapter:
-                    llama_cpp.llama_set_adapter_lora(self._llm.ctx, self._adapter, 1.0)
+                    self._apply_adapter(1.0)
                 else:
                     raise RuntimeError(f"Failed to load LoRA adapter: {adapter_path}")
             else:
@@ -105,6 +105,16 @@ class PawFunction:
         self._n_prefix = len(self._prefix_tokens)
 
         self._load_or_eval_prefix()
+
+    def _apply_adapter(self, scale: float):
+        """Apply LoRA adapter, compatible with both old and new llama.cpp API."""
+        import ctypes
+        if hasattr(llama_cpp, "llama_set_adapters_lora"):
+            adapters = (llama_cpp.llama_adapter_lora_p_ctypes * 1)(self._adapter)
+            scales = (ctypes.c_float * 1)(scale)
+            llama_cpp.llama_set_adapters_lora(self._llm.ctx, adapters, 1, scales)
+        else:
+            llama_cpp.llama_set_adapter_lora(self._llm.ctx, self._adapter, scale)
 
     def _load_or_eval_prefix(self):
         """Load prefix KV state from disk cache, or evaluate and save it."""
@@ -203,12 +213,7 @@ class PawFunction:
         return output_bytes.decode("utf-8", errors="replace").strip()
 
     def __del__(self):
-        if hasattr(self, "_adapter") and self._adapter:
-            try:
-                llama_cpp.llama_rm_adapter_lora(self._llm.ctx, self._adapter)
-                llama_cpp.llama_adapter_lora_free(self._adapter)
-            except Exception:
-                pass
+        self._adapter = None
 
     @property
     def spec(self) -> str:

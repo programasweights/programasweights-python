@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "programasweights"
-version = "0.2.5"
+version = "0.2.6"
 description = "Compile natural language specifications into neural programs that run locally via llama.cpp."
 readme = "PYPI_README.md"
 requires-python = ">=3.9"
@@ -28,7 +28,7 @@ classifiers = [
 ]
 dependencies = [
   "httpx>=0.27.0,<1.0",
-  "llama-cpp-python>=0.3.0,<=0.3.18",
+  "llama-cpp-python>=0.3.0,<=0.3.19",
 ]
 
 [project.urls]

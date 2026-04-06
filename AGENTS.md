@@ -93,11 +93,7 @@ if label != "other":
 
 Chain them with regular Python logic.
 
-## Case Studies
-
-Production examples with iterative spec-tuning walkthroughs: [site navigation](https://programasweights.readthedocs.io/en/latest/case-studies/site-navigation/) (5-program pipeline) and [semantic search](https://programasweights.readthedocs.io/en/latest/case-studies/semantic-search/) (reranking without a vector database). See also [log monitoring](https://programasweights.readthedocs.io/en/latest/case-studies/log-monitoring/) below.
-
-## Event-Driven Monitoring
+## Log Monitoring
 
 PAW functions can classify log output. Compile once with examples from your specific logs, then reuse the function locally forever:
 
@@ -203,4 +199,8 @@ paw.login()
 
 - Spec + input + output share a ~2048 token context window. Inputs that exceed it will error.
 - `max_tokens` defaults to `None`: generation runs until EOS or the context limit.
+
+## Case Studies
+
+Detailed walkthroughs of building production systems with PAW, including what we tried and what we learned: [log monitoring](https://programasweights.readthedocs.io/en/latest/case-studies/log-monitoring/), [site navigation](https://programasweights.readthedocs.io/en/latest/case-studies/site-navigation/), [semantic search](https://programasweights.readthedocs.io/en/latest/case-studies/semantic-search/).
 

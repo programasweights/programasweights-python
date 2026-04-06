@@ -78,6 +78,11 @@ Output: delete
 - **Include examples from your actual data**: Examples outperform prose-only descriptions.
 - **Debug failures before sweeping**: Look at specific failing examples and understand WHY before trying many variants.
 
+## Context Window
+
+- Spec + input + output share a ~2048 token context window. Inputs that exceed it will error.
+- `max_tokens` defaults to `None`: generation runs until EOS or the context limit.
+
 ## Chaining Functions
 
 Multiple PAW functions can be composed for multi-step tasks:
@@ -194,11 +199,6 @@ paw.login()
 - **Base model shared** across functions on disk. Each LoRA adapter adds ~22 MB.
 - **Cache**: `~/.cache/programasweights/`. Override with `PAW_CACHE_DIR`.
 - **Offline** after first download.
-
-## Limits
-
-- Spec + input + output share a ~2048 token context window. Inputs that exceed it will error.
-- `max_tokens` defaults to `None`: generation runs until EOS or the context limit.
 
 ## Case Studies
 

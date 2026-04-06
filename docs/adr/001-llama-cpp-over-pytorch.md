@@ -17,5 +17,5 @@ Replace the PyTorch runtime with llama-cpp-python (~80MB install). Use GGUF mode
 - Inference uses Metal (Mac), CPU (Linux/Windows) — no GPU required
 - Must pre-render chat templates server-side (no transformers tokenizer on client)
 - .paw format must change from v2 (safetensors) to v3 (GGUF adapter)
-- Base model is downloaded once (~623MB for Q6_K) and shared across all functions
+- Base model is downloaded once (~594 MB for Q6_K) and shared across all functions
 - Per-function adapter download is ~23MB (Q4_0, confirmed lossless at 4096-scale eval)

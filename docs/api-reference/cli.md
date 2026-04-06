@@ -57,7 +57,7 @@ paw rename <program_id> <new-slug> [--json]
 | Argument | Description |
 |----------|-------------|
 | `program_id` | Program hash ID or current slug. |
-| `new-slug` | New slug name (2-50 chars, lowercase alphanumeric and hyphens). |
+| `new-slug` | New slug name (2-50 chars, lowercase alphanumeric and hyphens). Pass `""` to remove. |
 
 ## `paw info`
 

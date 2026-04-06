@@ -34,7 +34,11 @@ Compile a specification.
 | `name` | string | No | Display title. Auto-generated if omitted. |
 | `tags` | string[] | No | Tags for discovery. |
 
-**Response (JSON):** includes `job_id`, `status`, `program_id`, `slug` (if created), `pseudo_program`, and `timings`.
+**Response:**
+- **202 Accepted** on success — JSON with `job_id`, `status`, `program_id`, `slug` (if created), `pseudo_program`, and `timings`
+- **400** — unknown compiler
+- **422** — spec too short, too long, or token limit exceeded
+- **500** — compilation failed (server error)
 
 ### `POST /infer`
 
@@ -88,7 +92,11 @@ Owner-only fields: `public`, `name`, `tags`. Any authenticated user can set thei
 
 ### `GET /programs/{id_or_slug}/download`
 
-Redirects to the Hugging Face CDN for the `.paw` artifact. Private programs return 404 to non-owners.
+Downloads the `.paw` artifact. Returns one of:
+- **302** redirect to HuggingFace CDN (program already uploaded)
+- **200** file from server (freshly compiled, not yet on HF)
+- **202 Accepted** with `Retry-After` header (program assets still generating, retry after the indicated seconds)
+- **404** if program not found or private and not owned by the requester
 
 ### `GET /programs/resolve/{slug}`
 

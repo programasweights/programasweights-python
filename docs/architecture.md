@@ -31,7 +31,7 @@ vLLM multi-LoRA serving on GPU 2 (or GPU 1 in 2-GPU config). Each compiled progr
 
 ## Inference (Client-side SDK)
 
-llama-cpp-python loads the base GGUF model (623MB, downloaded once) and hot-swaps Q4_0 adapters per function call. No PyTorch or transformers required.
+llama-cpp-python loads the base GGUF model (594 MB, downloaded once) and hot-swaps Q4_0 adapters per function call. No PyTorch or transformers required.
 
 ## GPU Assignment
 

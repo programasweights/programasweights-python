@@ -27,6 +27,8 @@ class Program:
     compiler_snapshot: Optional[str] = None
     timings: Optional[dict] = None
     error: Optional[str] = None
+    version: Optional[int] = None
+    version_action: Optional[str] = None
 
 
 class PAWClient:
@@ -92,6 +94,8 @@ class PAWClient:
             compiler_snapshot=data.get("compiler_snapshot"),
             timings=data.get("timings"),
             error=data.get("error"),
+            version=data.get("version"),
+            version_action=data.get("version_action"),
         )
 
     def resolve_slug(self, slug: str) -> str:
@@ -176,6 +180,16 @@ class PAWClient:
         """Get program metadata from the server."""
         resp = httpx.get(
             f"{self._api_url}/api/v1/programs/{program_id}",
+            headers=self._headers(),
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def list_slug_versions(self, slug: str) -> dict:
+        """List all versions of a slug. Slug format: 'username/slug-name' or bare 'slug-name'."""
+        resp = httpx.get(
+            f"{self._api_url}/api/v1/programs/{slug}/versions",
             headers=self._headers(),
             timeout=10.0,
         )

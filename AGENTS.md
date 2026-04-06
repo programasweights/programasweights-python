@@ -161,6 +161,22 @@ Generate API keys at https://programasweights.com/settings.
 
 Commands: `paw compile --spec "..." --json`, `paw run --program <id> --input "..."`, `paw info <id>`, `paw rename <id> <slug>`, `paw login`. All support `--json` for structured output.
 
+## Versioning
+
+Slugs support version history. Recompiling with the same slug creates a new version:
+
+```python
+p1 = paw.compile("Count words v1", slug="word-counter")  # v1
+p2 = paw.compile("Count words v2", slug="word-counter")  # v2 (auto-bumps)
+
+fn = paw.function("da03/word-counter")     # resolves to main (latest)
+fn = paw.function("da03/word-counter@v1")  # pinned to v1
+
+versions = paw.list_versions("da03/word-counter")  # all versions
+```
+
+Pinned versions (`@v1`) are immutable and cached locally forever. Bare slugs always check the server for the latest main version (falls back to cache if offline).
+
 ## Full API Reference
 
 ```python
@@ -170,16 +186,19 @@ program = paw.compile(
     slug=None,                          # URL-safe handle (requires auth)
     public=True,                        # list on public hub
 )
-# Returns: Program(id, slug, status, timings, error)
+# Returns: Program(id, slug, status, version, version_action, timings, error)
 
 fn = paw.function(program)              # accepts Program object, hash ID, or slug
 fn = paw.function("a6b454023d41ac9ca845")
 fn = paw.function("da03/my-classifier")
+fn = paw.function("da03/my-classifier@v2")  # pinned version
+fn = paw.function("da03/my-classifier", offline=True)  # skip server check
 
 result: str = fn(input_text: str, max_tokens=None, temperature=0.0)
 
 fn = paw.compile_and_load(spec, compiler="paw-4b-qwen3-0.6b")
 
+versions = paw.list_versions("da03/my-classifier")  # version history
 programs = paw.list_programs(sort="recent", per_page=20)  # requires auth
 
 paw.login()

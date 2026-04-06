@@ -27,7 +27,7 @@ try:
     from importlib.metadata import version as _meta_version
     __version__ = _meta_version("programasweights")
 except Exception:
-    __version__ = "0.2.8"
+    __version__ = "0.3.0"
 
 from .config import get_api_url, get_api_key, set_api_key
 
@@ -74,7 +74,13 @@ def compile(
     result = client.compile(spec, compiler=compiler, name=name, tags=tags, public=public, slug=slug)
     label = f"{result.id}"
     if result.slug:
-        label += f" ({result.slug})"
+        ver_str = f" v{result.version}" if result.version and result.version > 1 else ""
+        action_str = ""
+        if result.version_action == "no_change":
+            action_str = " (no changes)"
+        elif result.version_action == "promoted":
+            action_str = " set as main"
+        label = f"{result.slug}{ver_str}{action_str}"
     status(f"Compiled: {label}")
     return result
 
@@ -84,6 +90,7 @@ def function(
     n_ctx: int = 2048,
     n_gpu_layers: int | None = None,
     verbose: bool = False,
+    offline: bool = False,
 ):
     """Load a compiled program for local inference via llama.cpp.
 
@@ -91,11 +98,14 @@ def function(
     Subsequent calls use the local cache.
 
     Args:
-        program_id: Program ID (str), slug, or a ``Program`` object from compile().
+        program_id: Program ID (str), slug (``da03/my-program``), pinned version
+            (``da03/my-program@v3``), or a ``Program`` object from compile().
         n_ctx: Context window size for llama.cpp.
         n_gpu_layers: GPU layers (-1 = all, 0 = CPU only). Defaults to CPU.
             Set ``PAW_GPU_LAYERS`` env var or pass explicitly for GPU acceleration.
         verbose: Print llama.cpp debug output.
+        offline: Skip server check for slug resolution and use local cache only.
+            Also set via ``PAW_OFFLINE=1`` env var.
 
     Returns:
         A callable ``PawFunction`` that takes an input string and returns output.
@@ -105,8 +115,7 @@ def function(
         >>> fn("Urgent: the server is down!")
         'immediate'
 
-        >>> program = paw.compile("Classify sentiment")
-        >>> fn = paw.function(program)  # accepts Program object directly
+        >>> fn = paw.function("da03/my-program@v2")  # pinned version
     """
     if hasattr(program_id, 'id'):
         program_id = program_id.slug or program_id.id
@@ -122,15 +131,42 @@ def function(
 
     resolved_id = program_id
     if not re.fullmatch(r"[a-f0-9]{16,64}", program_id):
-        cached = get_cached_slug(program_id)
-        if cached:
-            resolved_id = cached
+        is_pinned = bool(re.search(r"@v\d+$", program_id))
+        use_offline = offline or os.environ.get("PAW_OFFLINE", "").strip() in ("1", "true", "yes")
+
+        if is_pinned:
+            cached = get_cached_slug(program_id)
+            if cached:
+                resolved_id = cached
+            else:
+                status(f"Resolving {program_id}...")
+                from .client import PAWClient
+                client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
+                resolved_id = client.resolve_slug(program_id)
+                save_slug_mapping(program_id, resolved_id)
+        elif use_offline:
+            cached = get_cached_slug(program_id)
+            if cached:
+                resolved_id = cached
+            else:
+                raise RuntimeError(
+                    f"No cached version of '{program_id}'. Cannot resolve offline. "
+                    "Run once with internet to populate the cache."
+                )
         else:
-            status(f"Resolving {program_id}...")
             from .client import PAWClient
             client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
-            resolved_id = client.resolve_slug(program_id)
-            save_slug_mapping(program_id, resolved_id)
+            try:
+                status(f"Resolving {program_id}...")
+                resolved_id = client.resolve_slug(program_id)
+                save_slug_mapping(program_id, resolved_id)
+            except Exception:
+                cached = get_cached_slug(program_id)
+                if cached:
+                    status(f"Warning: could not reach server, using cached version of {program_id}")
+                    resolved_id = cached
+                else:
+                    raise
 
     if not is_program_cached(resolved_id):
         from .client import PAWClient
@@ -221,6 +257,25 @@ def compile_and_load(
     return function(program, n_ctx=n_ctx, n_gpu_layers=n_gpu_layers, verbose=verbose)
 
 
+def list_versions(slug: str) -> dict:
+    """List all versions of a named program (slug).
+
+    Args:
+        slug: Slug in ``username/slug-name`` or bare ``slug-name`` format.
+
+    Returns:
+        Dict with ``slug``, ``main_version``, and ``versions`` list.
+
+    Example:
+        >>> versions = paw.list_versions("da03/bibtex-normalizer")
+        >>> for v in versions["versions"]:
+        ...     print(f"v{v['version']}: {v['program_id'][:12]} {'(main)' if v['is_main'] else ''}")
+    """
+    from .client import PAWClient
+    client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
+    return client.list_slug_versions(slug)
+
+
 def list_programs(sort: str = "recent", per_page: int = 20, page: int = 1) -> dict:
     """List your compiled programs. Requires authentication (PAW_API_KEY).
 
@@ -242,6 +297,7 @@ __all__ = [
     "compile_and_load",
     "function",
     "list_programs",
+    "list_versions",
     "login",
     "get_api_url",
     "get_api_key",

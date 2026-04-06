@@ -51,8 +51,11 @@ class PawFunction:
             raise FileNotFoundError(f"No prompt_template.txt in {program_dir}")
         self._template = template_path.read_text()
 
+        from ._output import status
         interpreter = self._meta.get("interpreter", "Qwen/Qwen3-0.6B")
         base_model_path = cache.get_base_model_path(interpreter)
+
+        status("Loading interpreter...")
 
         if not verbose:
             import os as _os, sys as _sys
@@ -103,6 +106,7 @@ class PawFunction:
         self._n_prefix = len(self._prefix_tokens)
 
         self._load_or_eval_prefix()
+        status("Ready.")
 
     def _apply_adapter(self, scale: float):
         """Apply LoRA adapter, compatible with both old and new llama.cpp API."""

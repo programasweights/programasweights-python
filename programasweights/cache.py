@@ -54,9 +54,10 @@ def get_base_model_path(interpreter: str = "Qwen/Qwen3-0.6B") -> Path:
             f"Available: {list(INTERPRETER_TO_GGUF.keys())}"
         )
 
-    print(f"Downloading base model {gguf_name} (one-time download)...")
+    from ._output import status
+    status(f"Downloading interpreter {gguf_name} (one-time download)...")
     _download_file(url, gguf_path)
-    print(f"Saved to {gguf_path}")
+    status(f"Saved to {gguf_path}")
     return gguf_path
 
 
@@ -87,8 +88,10 @@ def _download_file(url: str, dest: Path):
                     if total > 0:
                         pct = downloaded / total * 100
                         mb = downloaded / 1024 / 1024
-                        print(f"\r  {mb:.1f} MB ({pct:.0f}%)", end="", flush=True)
-            print()
+                        from ._output import status_inline, status_end
+                        status_inline(f"  {mb:.1f} MB ({pct:.0f}%)")
+            from ._output import status_end
+            status_end()
         os.replace(str(tmp), str(dest))
     except BaseException:
         tmp.unlink(missing_ok=True)

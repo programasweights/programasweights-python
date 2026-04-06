@@ -114,9 +114,13 @@ class PAWClient:
         if (program_dir / "prompt_template.txt").exists():
             return program_dir
 
+        from ._output import status
+
+        status(f"Downloading program {program_id[:12]}...")
         max_wait = 30
         elapsed = 0
         resp = None
+        waiting_logged = False
         while elapsed < max_wait:
             resp = httpx.get(
                 f"{self._api_url}/api/v1/programs/{program_id}/download",
@@ -125,6 +129,9 @@ class PAWClient:
                 follow_redirects=True,
             )
             if resp.status_code == 202:
+                if not waiting_logged:
+                    status("Waiting for program to be ready...")
+                    waiting_logged = True
                 retry_after = int(resp.headers.get("Retry-After", "3"))
                 time.sleep(retry_after)
                 elapsed += retry_after
@@ -137,6 +144,9 @@ class PAWClient:
                 if "not found" in detail.lower():
                     raise RuntimeError(f"Program {program_id} not found on server.")
                 if elapsed < max_wait - 3:
+                    if not waiting_logged:
+                        status("Waiting for program to be ready...")
+                        waiting_logged = True
                     time.sleep(3)
                     elapsed += 3
                     continue

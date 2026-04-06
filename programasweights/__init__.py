@@ -27,7 +27,7 @@ try:
     from importlib.metadata import version as _meta_version
     __version__ = _meta_version("programasweights")
 except Exception:
-    __version__ = "0.2.7"
+    __version__ = "0.2.8"
 
 from .config import get_api_url, get_api_key, set_api_key
 
@@ -68,8 +68,15 @@ def compile(
         '{"name": "Alice"}'
     """
     from .client import PAWClient
+    from ._output import status
+    status("Compiling...")
     client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
-    return client.compile(spec, compiler=compiler, name=name, tags=tags, public=public, slug=slug)
+    result = client.compile(spec, compiler=compiler, name=name, tags=tags, public=public, slug=slug)
+    label = f"{result.id}"
+    if result.slug:
+        label += f" ({result.slug})"
+    status(f"Compiled: {label}")
+    return result
 
 
 def function(
@@ -111,12 +118,15 @@ def function(
     if n_gpu_layers is None:
         n_gpu_layers = int(os.environ.get("PAW_GPU_LAYERS", "0"))
 
+    from ._output import status
+
     resolved_id = program_id
     if not re.fullmatch(r"[a-f0-9]{16,64}", program_id):
         cached = get_cached_slug(program_id)
         if cached:
             resolved_id = cached
         else:
+            status(f"Resolving {program_id}...")
             from .client import PAWClient
             client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
             resolved_id = client.resolve_slug(program_id)

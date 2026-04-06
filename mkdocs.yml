@@ -55,6 +55,7 @@ nav:
     - Log Monitoring: case-studies/log-monitoring.md
     - Site Navigation: case-studies/site-navigation.md
     - Semantic Search: case-studies/semantic-search.md
+    - Tool Calling: case-studies/tool-calling.md
   - Advanced:
     - Architecture: advanced/architecture.md
     - Architecture Decision Records: advanced/adrs.md

@@ -202,5 +202,5 @@ paw.login()
 
 ## Case Studies
 
-Detailed walkthroughs of building production systems with PAW, including what we tried and what we learned: [log monitoring](https://programasweights.readthedocs.io/en/latest/case-studies/log-monitoring/), [site navigation](https://programasweights.readthedocs.io/en/latest/case-studies/site-navigation/), [semantic search](https://programasweights.readthedocs.io/en/latest/case-studies/semantic-search/).
+Detailed walkthroughs of building production systems with PAW, including what we tried and what we learned: [log monitoring](https://programasweights.readthedocs.io/en/latest/case-studies/log-monitoring/), [site navigation](https://programasweights.readthedocs.io/en/latest/case-studies/site-navigation/), [semantic search](https://programasweights.readthedocs.io/en/latest/case-studies/semantic-search/), [tool calling](https://programasweights.readthedocs.io/en/latest/case-studies/tool-calling/).
 

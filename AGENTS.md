@@ -28,7 +28,7 @@ program = paw.compile(
     compiler="paw-4b-qwen3-0.6b"  # or "paw-4b-gpt2" for smaller/faster
 )
 fn = paw.function(program.id)
-fn("{name: 'Alice',}")  # '{"name": "Alice"}'
+fn("{name: 'Alice',}")  # '{"name":"Alice"}'
 
 # Or compile and load in one step
 fn = paw.compile_and_load("Classify sentiment as positive or negative")

@@ -12,7 +12,7 @@ Quick start:
     # Compile your own from a description
     program = paw.compile("Fix malformed JSON: repair missing quotes and trailing commas")
     fn = paw.function(program.id)
-    fn("{name: 'Alice',}")  # '{"name": "Alice"}'
+    fn("{name: 'Alice',}")  # '{"name":"Alice"}'
 
 API reference:
     paw.compile(spec)          Compile a spec on the server, returns Program
@@ -65,7 +65,7 @@ def compile(
         ... )
         >>> fn = paw.function(program.slug)  # or paw.function(program.id)
         >>> fn("{name: 'Alice',}")
-        '{"name": "Alice"}'
+        '{"name":"Alice"}'
     """
     from .client import PAWClient
     from ._output import status

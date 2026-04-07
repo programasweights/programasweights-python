@@ -211,10 +211,12 @@ paw.login()
 | `RuntimeError: assets not ready` on download | Program still generating after compile | SDK polls automatically for up to 30s. If persistent, recompile. |
 | `httpx.HTTPStatusError: 422` on compile | Spec too short (<10 chars) | Adjust spec length. |
 | `httpx.HTTPStatusError: 429` | Rate limit exceeded | Wait, or sign in for higher limits. |
+| GPU/Metal errors on load | GPU backend not available or incompatible | Set `PAW_GPU_LAYERS=0` or pass `n_gpu_layers=0` to force CPU. |
 
 ## Performance
 
-- **First call** ~5-15s (loads base model). Subsequent calls 0.5-5s depending on input length.
+- **GPU acceleration** enabled by default (`n_gpu_layers=-1`). Uses Metal on Mac, CUDA on Linux, falls back to CPU automatically. If GPU causes issues, set `PAW_GPU_LAYERS=0` or pass `n_gpu_layers=0`.
+- **First call** ~1-5s (loads base model). Subsequent calls ~0.05-0.5s depending on input length and GPU availability.
 - **Base model shared** across functions on disk. Each LoRA adapter adds ~22 MB.
 - **Cache**: `~/.cache/programasweights/`. Override with `PAW_CACHE_DIR`.
 - **Offline** after first download.

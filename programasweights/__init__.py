@@ -101,8 +101,9 @@ def function(
         program_id: Program ID (str), slug (``da03/my-program``), pinned version
             (``da03/my-program@v3``), or a ``Program`` object from compile().
         n_ctx: Context window size for llama.cpp.
-        n_gpu_layers: GPU layers (-1 = all, 0 = CPU only). Defaults to CPU.
-            Set ``PAW_GPU_LAYERS`` env var or pass explicitly for GPU acceleration.
+        n_gpu_layers: GPU layers (-1 = all GPU, 0 = CPU only). Defaults to -1
+            (auto-uses Metal/CUDA if available, safe fallback to CPU).
+            Set ``PAW_GPU_LAYERS=0`` env var to force CPU-only.
         verbose: Print llama.cpp debug output.
         offline: Skip server check for slug resolution and use local cache only.
             Also set via ``PAW_OFFLINE=1`` env var.
@@ -125,7 +126,7 @@ def function(
     from .runtime_llamacpp import PawFunction
 
     if n_gpu_layers is None:
-        n_gpu_layers = int(os.environ.get("PAW_GPU_LAYERS", "0"))
+        n_gpu_layers = int(os.environ.get("PAW_GPU_LAYERS", "-1"))
 
     from ._output import status
 

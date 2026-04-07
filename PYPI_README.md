@@ -18,7 +18,7 @@ import programasweights as paw
 # Use a pre-compiled function (downloads once, runs locally forever)
 fn = paw.function("email-triage")
 fn("Urgent: the server is down!")        # "immediate"
-fn("Newsletter: spring picnic")          # "can wait"
+fn("Newsletter: spring picnic")          # "wait"
 
 # Compile your own from a description
 program = paw.compile(
@@ -36,14 +36,16 @@ fn("I love this!")  # "positive"
 
 ## Two Compilers
 
-|                    | Standard (Qwen3 0.6B)   | Compact (GPT-2 124M)   |
-|--------------------|-------------------------|------------------------|
-| Compiler name      | `paw-4b-qwen3-0.6b`    | `paw-4b-gpt2`          |
-| Accuracy           | Higher                  | Lower                  |
-| Base model size    | 594 MB                  | 105 MB                 |
-| Program size       | ~22 MB                  | ~5 MB                  |
-| Inference speed    | ~90ms (server)          | ~50ms (server)         |
-| Runs in browser    | No                      | Yes                    |
+
+|                 | Standard (Qwen3 0.6B) | Compact (GPT-2 124M) |
+| --------------- | --------------------- | -------------------- |
+| Compiler name   | `paw-4b-qwen3-0.6b`   | `paw-4b-gpt2`        |
+| Accuracy        | Higher                | Lower                |
+| Base model size | 594 MB                | 105 MB               |
+| Program size    | ~22 MB                | ~5 MB                |
+| Inference speed | ~90ms (server)        | ~50ms (server)       |
+| Runs in browser | No                    | Yes                  |
+
 
 Default is Standard (Qwen3 0.6B). Use Compact (GPT-2) when you need smaller files or browser deployment.
 
@@ -69,9 +71,9 @@ See the [browser SDK repo](https://github.com/programasweights/programasweights-
 
 PAW works with Cursor, Claude, Codex, and other AI coding assistants. Paste this into your agent's chat:
 
-> I want to use ProgramAsWeights (PAW) to create fuzzy text functions that run locally. Read the instructions at https://programasweights.com/agents and help me integrate it.
+> I want to use ProgramAsWeights (PAW) to create fuzzy text functions that run locally. Read the instructions at [https://programasweights.com/AGENTS.md](https://programasweights.com/AGENTS.md) and help me integrate it.
 
-Or save [`AGENTS.md`](https://programasweights.com/agents) to your project root — agents read it automatically.
+Or save `[AGENTS.md](https://programasweights.com/agents)` to your project root — agents read it automatically.
 
 ## When to Use PAW
 

@@ -20,7 +20,7 @@ import programasweights as paw
 # "email-triage" is an official pre-compiled program (slug)
 fn = paw.function("email-triage")
 fn("Urgent: server is down!")  # "immediate"
-fn("Newsletter: spring picnic")  # "can wait"
+fn("Newsletter: spring picnic")  # "wait"
 
 # Compile your own from a description
 program = paw.compile(

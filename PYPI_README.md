@@ -43,11 +43,12 @@ fn("I love this!")  # "positive"
 | Accuracy        | Higher                | Lower                |
 | Base model size | 594 MB                | 105 MB               |
 | Program size    | ~22 MB                | ~5 MB                |
-| Inference speed | ~90ms (server)        | ~50ms (server)       |
-| Runs in browser | No                    | Yes                  |
-
+| Local inference | ~0.05-0.5s per call   | ~0.03-0.3s per call  |
+| Runs in browser | No                    | Yes (WebAssembly)    |
 
 Default is Standard (Qwen3 0.6B). Use Compact (GPT-2) when you need smaller files or browser deployment.
+
+GPU acceleration is enabled by default (Metal on Mac, CUDA on Linux, falls back to CPU). Set `PAW_GPU_LAYERS=0` to force CPU if GPU causes issues.
 
 ## Browser SDK
 

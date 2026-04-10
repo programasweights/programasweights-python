@@ -38,7 +38,7 @@ fn("I love this!")  # "positive"
 ## Two Compilers
 
 - **Standard** (`paw-4b-qwen3-0.6b`) — higher accuracy, 594 MB base + ~22 MB/program. Default.
-- **Compact** (`paw-4b-gpt2`) — smaller (105 MB base + ~5 MB/program), runs in browser via WebAssembly.
+- **Compact** (`paw-4b-gpt2`) — smaller (134 MB base + ~5 MB/program), runs in browser via WebAssembly.
 
 ## When to Use PAW
 

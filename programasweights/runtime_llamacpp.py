@@ -88,7 +88,6 @@ class PawFunction:
                 _os.close(_old_stderr)
 
         placeholder = "{INPUT_PLACEHOLDER}"
-        self._use_special = interpreter not in ("gpt2",)
 
         if placeholder in self._template:
             prefix_text = self._template.split(placeholder)[0]
@@ -99,8 +98,8 @@ class PawFunction:
 
         self._prefix_tokens = self._llm.tokenize(
             prefix_text.encode("utf-8"),
-            add_bos=not self._use_special,
-            special=self._use_special,
+            add_bos=False,
+            special=True,
         )
         self._suffix_text = suffix_text
         self._n_prefix = len(self._prefix_tokens)
@@ -183,7 +182,7 @@ class PawFunction:
         input_tokens = self._llm.tokenize(
             input_with_suffix.encode("utf-8"),
             add_bos=False,
-            special=self._use_special,
+            special=True,
         )
 
         tokens_used = self._n_prefix + len(input_tokens)

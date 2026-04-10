@@ -14,16 +14,17 @@ Concise records of major technical choices. Full ADR files may live elsewhere in
 
 ---
 
-## ADR 002: Q4_0 adapter and Q6_K base quantization
+## ADR 002: Quantization levels for base models and adapters
 
-**Decision:** Use **Q4_0** for adapters and **Q6_K** for the base model in shipped bundles.
+**Decision:** Use **Q4_0** for adapters. For base models, use **Q6_K** for Qwen3 0.6B and **Q8_0** for GPT-2.
 
 **Context:** Empirical evaluation on **4096** held-out examples across quantization settings informed the trade-off.
 
 **Consequence:**
 
-- **Q6_K base** — quality is preserved while the footprint is roughly **60% smaller** than fp16.
-- **Q4_0 adapter** — quality loss is negligible; adapter size drops to about **23 MB** versus **78 MB** for a heavier format at comparable settings in prior experiments.
+- **Q6_K base (Qwen3 0.6B)** — quality is preserved while the footprint is roughly **60% smaller** than fp16. 4096-sample eval shows no accuracy loss vs fp16.
+- **Q8_0 base (GPT-2)** — Q6_K caused ~3.5% accuracy loss on GPT-2 (4096-sample eval). Q8_0 closes the gap at only ~29 MB additional cost (134 MB vs 105 MB).
+- **Q4_0 adapter** — quality loss is negligible for both models; adapter size drops to about **23 MB** (Qwen3) / **5 MB** (GPT-2) versus **78 MB** / **19 MB** at fp16.
 
 ---
 

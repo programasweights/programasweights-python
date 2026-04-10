@@ -39,6 +39,7 @@ def compile(
     tags: list[str] | None = None,
     public: bool = True,
     slug: str | None = None,
+    ephemeral: bool = False,
 ):
     """Compile a natural language specification into a neural program.
 
@@ -71,7 +72,7 @@ def compile(
     from ._output import status
     status("Compiling...")
     client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
-    result = client.compile(spec, compiler=compiler, name=name, tags=tags, public=public, slug=slug)
+    result = client.compile(spec, compiler=compiler, name=name, tags=tags, public=public, slug=slug, ephemeral=ephemeral)
     label = f"{result.id}"
     if result.slug:
         ver_str = f" v{result.version}" if result.version and result.version > 1 else ""

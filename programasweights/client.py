@@ -52,6 +52,7 @@ class PAWClient:
         tags: list[str] | None = None,
         public: bool = True,
         slug: str | None = None,
+        ephemeral: bool = False,
     ) -> Program:
         """Compile a spec into a neural program on the server.
 
@@ -71,6 +72,8 @@ class PAWClient:
             httpx.HTTPStatusError: On API errors (422 for validation, 429 for rate limit).
         """
         body: dict = {"spec": spec, "compiler": compiler, "public": public}
+        if ephemeral:
+            body["ephemeral"] = True
         if name:
             body["name"] = name
         if tags:
@@ -121,7 +124,7 @@ class PAWClient:
         from ._output import status
 
         status(f"Downloading program {program_id[:12]}...")
-        max_wait = 30
+        max_wait = 60
         elapsed = 0
         resp = None
         waiting_logged = False

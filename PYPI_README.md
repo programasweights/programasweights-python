@@ -41,7 +41,7 @@ fn("I love this!")  # "positive"
 | --------------- | --------------------- | -------------------- |
 | Compiler name   | `paw-4b-qwen3-0.6b`   | `paw-4b-gpt2`        |
 | Accuracy        | Higher                | Lower                |
-| Base model size | 594 MB                | 105 MB               |
+| Base model size | 594 MB                | 134 MB               |
 | Program size    | ~22 MB                | ~5 MB                |
 | Local inference | ~0.05-0.5s per call   | ~0.03-0.3s per call  |
 | Runs in browser | No                    | Yes (WebAssembly)    |

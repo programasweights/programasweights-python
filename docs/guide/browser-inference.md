@@ -84,7 +84,7 @@ paw.configure({
 
 | Component | Size | When |
 |-----------|------|------|
-| Base model (GPT-2 Q6_K) | 105 MB | First program load (cached) |
+| Base model (GPT-2 Q8_0) | 134 MB | First program load (cached) |
 | LoRA adapter | ~5 MB | Per program |
 | Prefix cache | ~7 MB | Per program |
 | **First load total** | **~117 MB** | |

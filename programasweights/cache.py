@@ -5,6 +5,7 @@ Cache structure:
     ~/.cache/programasweights/
         base_models/
             qwen3-0.6b-q6_k.gguf      # ~594 MB, downloaded once
+            gpt2-q8_0.gguf            # ~134 MB, downloaded once
         programs/
             <program_id>/
                 adapter.gguf            # ~23 MB, Q4_0 LoRA
@@ -25,12 +26,12 @@ from . import config
 
 BASE_MODEL_URLS = {
     "qwen3-0.6b-q6_k": "https://huggingface.co/programasweights/Qwen3-0.6B-GGUF-Q6_K/resolve/main/qwen3-0.6b-q6_k.gguf",
-    "gpt2-q6_k": "https://huggingface.co/programasweights/GPT2-GGUF-Q6_K/resolve/main/gpt2-q6_k.gguf",
+    "gpt2-q8_0": "https://huggingface.co/programasweights/GPT2-GGUF-Q8_0/resolve/main/gpt2-q8_0.gguf",
 }
 
 INTERPRETER_TO_GGUF = {
     "Qwen/Qwen3-0.6B": "qwen3-0.6b-q6_k",
-    "gpt2": "gpt2-q6_k",
+    "gpt2": "gpt2-q8_0",
 }
 
 

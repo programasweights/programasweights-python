@@ -2,7 +2,7 @@
 
 Run PAW programs directly in the browser via WebAssembly. No server, no API key, no setup.
 
-Programs compiled with the compact interpreter (GPT-2 124M) run entirely client-side. The base model (105 MB) downloads once and is cached; each program adds only ~5 MB.
+Programs compiled with the compact interpreter (GPT-2 124M) run entirely client-side. The base model (134 MB) downloads once and is cached; each program adds ~12 MB total (~5 MB adapter + ~7 MB prefix cache).
 
 ## Quick Start
 
@@ -12,7 +12,7 @@ Programs compiled with the compact interpreter (GPT-2 124M) run entirely client-
 <script type="module">
   import paw from 'https://cdn.jsdelivr.net/npm/@programasweights/web';
 
-  const fn = await paw.function('programasweights/email-triage');
+  const fn = await paw.function('email-triage');
   const result = await fn('Urgent: server is down!');
   console.log(result); // "immediate"
 </script>
@@ -27,7 +27,7 @@ npm install @programasweights/web
 ```javascript
 import paw from '@programasweights/web';
 
-const fn = await paw.function('programasweights/email-triage', {
+const fn = await paw.function('email-triage', {
   onProgress: ({ loaded, total, stage }) => {
     console.log(`${stage}: ${Math.round(loaded/total*100)}%`);
   },
@@ -42,7 +42,7 @@ await fn.free();
 
 ## How It Works
 
-1. **Base model** — Compact interpreter (GPT-2 124M, 105 MB) downloads from HuggingFace CDN and is cached in the browser after first load.
+1. **Base model** — Compact interpreter (GPT-2 124M, 134 MB) downloads from HuggingFace CDN and is cached in the browser after first load.
 2. **LoRA adapter** — Each program is a ~5 MB Q4_0 GGUF LoRA adapter that specializes the base model for a specific task.
 3. **Prefix cache** — A precomputed KV cache (~7 MB) eliminates the prompt prefill step, making the first inference call fast.
 4. **Inference** — Runs via WebAssembly (llama.cpp compiled to WASM with SIMD). ~200ms per call on Chrome.
@@ -87,7 +87,7 @@ paw.configure({
 | Base model (GPT-2 Q8_0) | 134 MB | First program load (cached) |
 | LoRA adapter | ~5 MB | Per program |
 | Prefix cache | ~7 MB | Per program |
-| **First load total** | **~117 MB** | |
+| **First load total** | **~146 MB** | |
 | **Switching programs** | **~12 MB** | |
 
 ## Browser Compatibility
@@ -135,5 +135,5 @@ Without these headers, the SDK falls back to single-threaded WASM (still functio
 ## Limitations
 
 - Only programs compiled with the **compact** interpreter (GPT-2 124M) are supported. Programs compiled with the standard interpreter (Qwen3 0.6B) are too large for browser inference (~594 MB base model).
-- The 105 MB base model download may be slow on mobile connections.
+- The 134 MB base model download may be slow on mobile connections.
 - Performance varies by browser (Chrome is fastest).

@@ -65,7 +65,7 @@ Programs compiled with the compact interpreter (GPT-2 124M) also run directly in
 ```html
 <script type="module">
   import paw from '@programasweights/web';
-  const fn = await paw.function('programasweights/email-triage');
+  const fn = await paw.function('email-triage');
   const result = await fn('Urgent: server is down!');
 </script>
 ```

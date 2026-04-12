@@ -21,20 +21,20 @@ Pages: /playground, /hub, /browser, /docs, /settings, /about
 
 ### Attempt 2: Reframe as classification
 
-Instead of generating URLs, output a digit: 1 = Playground, 2 = Hub, 3 = Browser, etc. The frontend maps digits to actual routes.
+Instead of generating URLs, output a short semantic label such as `playground`, `docs`, or `feedback`. The frontend maps those labels to actual destinations.
 
 ```
-Classify the user's intent. Return ONLY a single digit.
-1 = Create or compile a new program
-2 = Browse or search existing programs
-3 = Run a program in the browser
+Classify the user's intent. Return ONLY a single label.
+playground = Create or compile a new program
+hub = Browse or search existing programs
+browser = Run a program in the browser
 ...
-0 = None of the above
+none = None of the above
 ```
 
 **Result:** Accuracy jumped from ~67% to ~88%. Classification is far more reliable than generation for routing.
 
-**Lesson:** Reframe generation tasks as classification whenever possible. Output a label or digit, map it to the real value in your code.
+**Lesson:** Reframe generation tasks as classification whenever possible. Output a short label, map it to the real value in your code.
 
 ### Attempt 3: Add Q&A support
 
@@ -71,8 +71,8 @@ validator = paw.function("my-answer-validator")
 
 def handle_query(user_query: str):
     destination = router(user_query)
-    if destination != "0":
-        return {"action": "navigate", "page": PAGES[int(destination)]}
+    if destination != "none":
+        return {"action": "navigate", "page": PAGE_MAP[destination]}
 
     category = q_type(user_query)
     if category == "yes_no":
@@ -92,36 +92,36 @@ Each program has a focused spec. For example, the page classifier:
 
 ```python
 router = paw.compile("""
-Classify the user's intent. Return ONLY a single digit.
-1 = Create or compile something new
-2 = Browse or search existing items
-3 = Run something in the browser
-4 = Read documentation
-5 = Manage account or API keys
-0 = None of the above (likely a question)
+Classify the user's intent. Return ONLY a single label.
+playground = Create or compile something new
+hub = Browse or search existing items
+browser = Run something in the browser
+docs = Read documentation
+settings = Manage account or API keys
+none = None of the above (likely a question)
 
 Input: how do I get started
-Output: 4
+Output: docs
 
 Input: browse community programs
-Output: 2
+Output: hub
 
 Input: is it free?
-Output: 0
+Output: none
 """)
 ```
 
 ## Adapting this for your site
 
 1. **List your pages** with short descriptions of what users do there
-2. **Compile a classifier** that maps intents to page numbers
+2. **Compile a classifier** that maps intents to short labels
 3. **Test with 20-30 real queries** your users would type — iterate on the spec wording
 4. If users also ask questions, add Q&A programs and a validator
 5. Each program compiles once and is cached forever — the pipeline runs locally with no API calls
 
 ## Takeaways
 
-- **Classification beats generation** for routing. Output a label, map it in code.
+- **Classification beats generation** for routing. Output a short label, map it in code.
 - **Multiple small programs beat one complex program.** When accuracy drops, split.
 - **A validator catches failures** the other programs miss — cheap insurance.
 - **Iterate with real queries.** Build a small test set, measure, adjust wording, repeat.

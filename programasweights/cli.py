@@ -169,7 +169,7 @@ def main():
 
     p = sub.add_parser("compile", help="Compile a spec on the server")
     p.add_argument("--spec", required=True, help="Natural language specification")
-    p.add_argument("--compiler", default="paw-4b-qwen3-0.6b", help="Compiler model")
+    p.add_argument("--compiler", default=None, help="Compiler model (omit to use the server default)")
     p.add_argument("--slug", default=None, help="URL-safe handle (e.g. 'message-classifier')")
     p.add_argument("--private", action="store_true", help="Make program private (not listed on hub)")
     p.add_argument("--json", action="store_true", help="JSON output")

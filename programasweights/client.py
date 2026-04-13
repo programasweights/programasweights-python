@@ -6,6 +6,7 @@ Handles compilation, program download, and authentication.
 
 from __future__ import annotations
 
+import json
 import os
 import time
 import zipfile
@@ -25,6 +26,10 @@ class Program:
     status: str
     slug: Optional[str] = None
     compiler_snapshot: Optional[str] = None
+    compiler_kind: Optional[str] = None
+    pseudo_program_strategy: Optional[str] = None
+    runtime_id: Optional[str] = None
+    runtime_manifest_version: Optional[int] = None
     timings: Optional[dict] = None
     error: Optional[str] = None
     version: Optional[int] = None
@@ -47,7 +52,7 @@ class PAWClient:
     def compile(
         self,
         spec: str,
-        compiler: str = "paw-4b-qwen3-0.6b",
+        compiler: str | None = None,
         name: str | None = None,
         tags: list[str] | None = None,
         public: bool = True,
@@ -71,7 +76,9 @@ class PAWClient:
         Raises:
             httpx.HTTPStatusError: On API errors (422 for validation, 429 for rate limit).
         """
-        body: dict = {"spec": spec, "compiler": compiler, "public": public}
+        body: dict = {"spec": spec, "public": public}
+        if compiler:
+            body["compiler"] = compiler
         if ephemeral:
             body["ephemeral"] = True
         if name:
@@ -95,6 +102,10 @@ class PAWClient:
             status=data.get("status", "unknown"),
             slug=data.get("slug"),
             compiler_snapshot=data.get("compiler_snapshot"),
+            compiler_kind=data.get("compiler_kind"),
+            pseudo_program_strategy=data.get("pseudo_program_strategy"),
+            runtime_id=data.get("runtime_id"),
+            runtime_manifest_version=data.get("runtime_manifest_version"),
             timings=data.get("timings"),
             error=data.get("error"),
             version=data.get("version"),
@@ -177,7 +188,35 @@ class PAWClient:
                     raise ValueError(f"Unsafe path in .paw archive: {member}")
             zf.extractall(program_dir)
 
+        self._hydrate_runtime_manifest(program_dir)
+
         return program_dir
+
+    def _hydrate_runtime_manifest(self, program_dir: Path) -> None:
+        meta_path = program_dir / "meta.json"
+        if not meta_path.exists():
+            return
+
+        try:
+            meta = json.loads(meta_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return
+
+        runtime_id = meta.get("runtime_id")
+        runtime = meta.get("runtime")
+        if isinstance(runtime, dict) and runtime.get("runtime_id") and runtime.get("local_sdk", {}).get("base_model"):
+            return
+        if not runtime_id:
+            return
+
+        try:
+            runtime_manifest = self.get_runtime_manifest(runtime_id)
+        except Exception:
+            return
+
+        meta["runtime"] = runtime_manifest
+        meta.setdefault("runtime_manifest_version", runtime_manifest.get("manifest_version"))
+        meta_path.write_text(json.dumps(meta, indent=2))
 
     def get_program_meta(self, program_id: str) -> dict:
         """Get program metadata from the server."""
@@ -188,6 +227,30 @@ class PAWClient:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def get_runtime_manifest(self, runtime_id: str) -> dict:
+        """Fetch a runtime manifest from the server and cache it locally."""
+        from . import cache
+
+        cached = cache.get_cached_runtime_manifest(runtime_id)
+        if cached:
+            return cached
+
+        return cache.fetch_runtime_manifest(
+            runtime_id,
+            api_url=self._api_url,
+            api_key=self._api_key,
+        )
+
+    def list_compilers(self) -> list[dict]:
+        """List available compilers from the server."""
+        resp = httpx.get(
+            f"{self._api_url}/api/v1/models/compilers",
+            headers=self._headers(),
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        return resp.json()["compilers"]
 
     def list_slug_versions(self, slug: str) -> dict:
         """List all versions of a slug. Slug format: 'username/slug-name' or bare 'slug-name'."""

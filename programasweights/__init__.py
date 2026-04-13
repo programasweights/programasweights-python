@@ -27,14 +27,14 @@ try:
     from importlib.metadata import version as _meta_version
     __version__ = _meta_version("programasweights")
 except Exception:
-    __version__ = "0.3.1"
+    __version__ = "0.4.0"
 
 from .config import get_api_url, get_api_key, set_api_key
 
 
 def compile(
     spec: str,
-    compiler: str = "paw-4b-qwen3-0.6b",
+    compiler: str | None = None,
     name: str | None = None,
     tags: list[str] | None = None,
     public: bool = True,
@@ -49,7 +49,8 @@ def compile(
 
     Args:
         spec: Full specification text. Include examples in the text if desired.
-        compiler: Compiler model (alias or snapshot name).
+        compiler: Compiler model (alias or snapshot name). If omitted, the
+            server chooses the current default compiler.
         name: Human-readable program name (display title for the hub).
         tags: Tags for hub discovery.
         public: Whether to list on the public hub.
@@ -126,6 +127,7 @@ def function(
     from .cache import is_program_cached, get_program_dir, get_cached_slug, save_slug_mapping
     from .runtime_llamacpp import PawFunction
 
+    offline = offline or os.environ.get("PAW_OFFLINE", "").strip() in ("1", "true", "yes")
     if n_gpu_layers is None:
         n_gpu_layers = int(os.environ.get("PAW_GPU_LAYERS", "-1"))
 
@@ -134,7 +136,7 @@ def function(
     resolved_id = program_id
     if not re.fullmatch(r"[a-f0-9]{16,64}", program_id):
         is_pinned = bool(re.search(r"@v\d+$", program_id))
-        use_offline = offline or os.environ.get("PAW_OFFLINE", "").strip() in ("1", "true", "yes")
+        use_offline = offline
 
         if is_pinned:
             cached = get_cached_slug(program_id)
@@ -177,7 +179,13 @@ def function(
 
     program_dir = get_program_dir(resolved_id)
     return PawFunction(
-        program_dir, n_ctx=n_ctx, n_gpu_layers=n_gpu_layers, verbose=verbose,
+        program_dir,
+        n_ctx=n_ctx,
+        n_gpu_layers=n_gpu_layers,
+        verbose=verbose,
+        api_url=get_api_url(),
+        api_key=get_api_key(),
+        offline=offline,
     )
 
 
@@ -228,7 +236,7 @@ def login(key: str | None = None):
 
 def compile_and_load(
     spec: str,
-    compiler: str = "paw-4b-qwen3-0.6b",
+    compiler: str | None = None,
     n_ctx: int = 2048,
     n_gpu_layers: int | None = None,
     verbose: bool = False,
@@ -241,7 +249,8 @@ def compile_and_load(
 
     Args:
         spec: Natural language specification.
-        compiler: Compiler model name.
+        compiler: Compiler model name. If omitted, the server chooses the
+            current default compiler.
         n_ctx: Context window size for llama.cpp.
         n_gpu_layers: GPU layers (-1 = all, 0 = CPU only).
         verbose: Print llama.cpp debug output.
@@ -294,10 +303,18 @@ def list_programs(sort: str = "recent", per_page: int = 20, page: int = 1) -> di
     return client.list_programs(sort=sort, per_page=per_page, page=page)
 
 
+def list_compilers() -> list[dict]:
+    """List available compilers from the server."""
+    from .client import PAWClient
+    client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
+    return client.list_compilers()
+
+
 __all__ = [
     "compile",
     "compile_and_load",
     "function",
+    "list_compilers",
     "list_programs",
     "list_versions",
     "login",

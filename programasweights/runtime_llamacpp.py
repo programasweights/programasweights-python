@@ -1,7 +1,8 @@
 """
 llama.cpp runtime for local inference with LoRA adapters.
 
-Loads a base GGUF model (Q6_K) and applies a Q4_0 LoRA adapter per-program.
+Loads a base GGUF model (Q6_K for Qwen3, Q8_0 for GPT-2) and applies a
+Q4_0 LoRA adapter per-program.
 Uses the pre-rendered prompt template from the .paw bundle.
 
 Prefix KV cache is saved to disk after the first call and reloaded on
@@ -33,6 +34,9 @@ class PawFunction:
         n_ctx: int = 2048,
         n_gpu_layers: int = 0,
         verbose: bool = False,
+        api_url: str | None = None,
+        api_key: str | None = None,
+        offline: bool = False,
     ):
         program_dir = Path(program_dir)
         self._program_dir = program_dir
@@ -53,7 +57,17 @@ class PawFunction:
 
         from ._output import status
         interpreter = self._meta.get("interpreter", "Qwen/Qwen3-0.6B")
-        base_model_path = cache.get_base_model_path(interpreter)
+        runtime_manifest = cache.resolve_runtime_manifest(
+            self._meta,
+            api_url=api_url,
+            api_key=api_key,
+            offline=offline,
+        )
+        if runtime_manifest:
+            self._meta["runtime"] = runtime_manifest
+            self._meta.setdefault("runtime_id", runtime_manifest.get("runtime_id"))
+            self._meta.setdefault("runtime_manifest_version", runtime_manifest.get("manifest_version"))
+        base_model_path = cache.get_base_model_path(interpreter, runtime_manifest=runtime_manifest)
 
         status("Loading interpreter...")
 

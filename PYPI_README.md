@@ -71,6 +71,8 @@ const result = await fn('Urgent: the server is down!');
 
 If you load by program ID, browser inference only depends on Hugging Face-hosted assets. Slugs still need one PAW API lookup.
 
+New browser-compatible programs are uploaded to Hugging Face asynchronously after compile. They are usually ready within a minute or two, but under load can take a few minutes, so a freshly compiled browser program may need a short wait before the JS SDK can load it.
+
 See the [browser SDK repo](https://github.com/programasweights/programasweights-js) for full documentation.
 
 ## Use with AI Agents

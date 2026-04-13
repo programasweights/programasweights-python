@@ -60,12 +60,12 @@ At runtime, the SDK loads a quantized base model (Q6_K ~594 MB for Qwen3, Q8_0 ~
 
 ## Browser Inference
 
-Programs compiled with the compact interpreter (GPT-2 124M) also run directly in the browser via WebAssembly -- no server needed:
+Programs compiled with the compact interpreter (GPT-2 124M) also run directly in the browser via WebAssembly -- no custom server needed for inference:
 
 ```html
 <script type="module">
   import paw from '@programasweights/web';
-  const fn = await paw.function('email-triage');
+  const fn = await paw.function('email-triage-browser');
   const result = await fn('Urgent: server is down!');
 </script>
 ```

@@ -23,7 +23,6 @@ fn("Newsletter: spring picnic")          # "wait"
 # Compile your own from a description
 program = paw.compile(
     "Fix malformed JSON: repair missing quotes and trailing commas",
-    compiler="paw-4b-qwen3-0.6b",  # or "paw-4b-gpt2" for smaller/faster
     slug="json-fixer"              # optional: creates username/json-fixer handle
 )
 fn = paw.function(program.slug)    # or paw.function(program.id)
@@ -34,7 +33,9 @@ fn = paw.compile_and_load("Classify sentiment as positive or negative")
 fn("I love this!")  # "positive"
 ```
 
-## Two Compilers
+If you specifically want the smaller browser-compatible runtime, pass `compiler="paw-4b-gpt2"`. Otherwise, omit `compiler` and let the server default decide.
+
+## Current Public Compilers
 
 
 |                 | Standard (Qwen3 0.6B) | Compact (GPT-2 124M) |
@@ -46,13 +47,15 @@ fn("I love this!")  # "positive"
 | Local inference | ~0.05-0.5s per call   | ~0.03-0.3s per call  |
 | Runs in browser | No                    | Yes (WebAssembly)    |
 
-Default is Standard (Qwen3 0.6B). Use Compact (GPT-2) when you need smaller files or browser deployment.
+The current server default is Standard (`paw-4b-qwen3-0.6b`). Use Compact (`paw-4b-gpt2`) when you need smaller files or browser deployment.
+
+If you need to inspect available compiler aliases programmatically, use `paw.list_compilers()`.
 
 GPU acceleration is enabled by default (Metal on Mac, CUDA on Linux, falls back to CPU). Set `PAW_GPU_LAYERS=0` to force CPU if GPU causes issues.
 
 ## Browser SDK
 
-Programs compiled with GPT-2 also run entirely in the browser via WebAssembly — no server needed, data never leaves the user's device.
+Programs compiled with GPT-2 also run in the browser via WebAssembly. The initial model and program assets download automatically; inference then runs client-side.
 
 ```bash
 npm install @programasweights/web
@@ -61,10 +64,12 @@ npm install @programasweights/web
 ```javascript
 import paw from '@programasweights/web';
 
-const fn = await paw.function('programasweights/email-triage');
+const fn = await paw.function('email-triage-browser');
 const result = await fn('Urgent: the server is down!');
 // result: "immediate"
 ```
+
+If you load by program ID, browser inference only depends on Hugging Face-hosted assets. Slugs still need one PAW API lookup.
 
 See the [browser SDK repo](https://github.com/programasweights/programasweights-js) for full documentation.
 

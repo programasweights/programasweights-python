@@ -27,7 +27,7 @@ try:
     from importlib.metadata import version as _meta_version
     __version__ = _meta_version("programasweights")
 except Exception:
-    __version__ = "0.4.1"
+    __version__ = "0.4.2"
 
 from .config import get_api_url, get_api_key, set_api_key
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "programasweights"
-version = "0.4.1"
+version = "0.4.2"
 description = "Compile natural language specifications into neural programs that run locally via llama.cpp."
 readme = "PYPI_README.md"
 requires-python = ">=3.9"

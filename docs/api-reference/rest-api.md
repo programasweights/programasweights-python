@@ -158,7 +158,12 @@ Successful responses may include:
 | `X-RateLimit-Limit` | Maximum requests per window. |
 | `X-RateLimit-Remaining` | Remaining requests in the current window. |
 
-Clients should backoff when receiving `429 Too Many Requests` and respect `Retry-After` when present.
+Hosted compile quotas:
+
+- Anonymous: **20 compiles/hour**, **1 concurrent compile**
+- Authenticated: **60 compiles/hour**, **2 concurrent compiles**
+
+Hosted server-side endpoints may also enforce additional operational concurrency or safety limits. Clients should back off when receiving `429 Too Many Requests` and respect `Retry-After` when present.
 
 ## Related
 

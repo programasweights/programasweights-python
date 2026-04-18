@@ -52,6 +52,7 @@ nav:
     - Publishing Programs: hub/publishing-programs.md
     - Feedback & Cases: hub/feedback-cases.md
   - Case Studies:
+    - Alien Taboo (Word Game): case-studies/alien-taboo.md
     - Log Monitoring: case-studies/log-monitoring.md
     - Site Navigation: case-studies/site-navigation.md
     - Semantic Search: case-studies/semantic-search.md

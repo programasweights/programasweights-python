@@ -291,31 +291,29 @@ class TestAuth:
     def test_compile_with_slug_authenticated(self):
         import time
         slug = f"test-sdk-{int(time.time()) % 100000}"
-        old_key = paw.api_key
-        try:
-            paw.api_key = API_KEY
-            program = paw.compile(
-                "Classify text as positive or negative sentiment.",
-                slug=slug,
-            )
-            assert program.id
-            assert program.slug
-            assert slug in program.slug
-        finally:
-            paw.api_key = old_key
+        program = paw.compile(
+            "Classify text as positive or negative sentiment.",
+            slug=slug,
+        )
+        assert program.id
+        assert program.slug
+        assert slug in program.slug
 
     @needs_auth
     def test_compile_with_slug_bad_key(self):
-        old_key = paw.api_key
+        old_key = os.environ.get("PAW_API_KEY")
+        os.environ["PAW_API_KEY"] = "paw_sk_invalid_key_12345"
         try:
-            paw.api_key = "paw_sk_invalid_key_12345"
             with pytest.raises(Exception):
                 paw.compile(
                     "Classify text as positive or negative sentiment.",
                     slug="should-fail-auth",
                 )
         finally:
-            paw.api_key = old_key
+            if old_key is None:
+                del os.environ["PAW_API_KEY"]
+            else:
+                os.environ["PAW_API_KEY"] = old_key
 
     @needs_auth
     def test_cli_compile_with_api_key_flag(self):
@@ -336,34 +334,19 @@ class TestAuth:
 class TestSlugValidation:
     @needs_auth
     def test_slug_too_short(self):
-        old_key = paw.api_key
-        try:
-            paw.api_key = API_KEY
-            with pytest.raises(Exception) as exc_info:
-                paw.compile("Classify text.", slug="x")
-            assert "422" in str(exc_info.value) or "invalid" in str(exc_info.value).lower()
-        finally:
-            paw.api_key = old_key
+        with pytest.raises(Exception) as exc_info:
+            paw.compile("Classify text.", slug="x")
+        assert "422" in str(exc_info.value) or "invalid" in str(exc_info.value).lower()
 
     @needs_auth
     def test_slug_invalid_characters(self):
-        old_key = paw.api_key
-        try:
-            paw.api_key = API_KEY
-            with pytest.raises(Exception):
-                paw.compile("Classify text.", slug="BAD SLUG!")
-        finally:
-            paw.api_key = old_key
+        with pytest.raises(Exception):
+            paw.compile("Classify text.", slug="BAD SLUG!")
 
     @needs_auth
     def test_slug_with_uppercase_rejected(self):
-        old_key = paw.api_key
-        try:
-            paw.api_key = API_KEY
-            with pytest.raises(Exception):
-                paw.compile("Classify text.", slug="MyProgram")
-        finally:
-            paw.api_key = old_key
+        with pytest.raises(Exception):
+            paw.compile("Classify text.", slug="MyProgram")
 
 
 # ── Phase 10: Privacy ──
@@ -373,36 +356,26 @@ class TestPrivacy:
     @needs_auth
     def test_compile_private_program(self):
         import httpx
-        old_key = paw.api_key
-        try:
-            paw.api_key = API_KEY
-            program = paw.compile("Private test program for counting vowels.", public=False)
-            assert program.id
+        program = paw.compile("Private test program for counting vowels.", public=False)
+        assert program.id
 
-            resp = httpx.get(
-                f"{paw.api_url}/api/v1/programs/{program.id}",
-                timeout=10.0,
-            )
-            assert resp.status_code == 404, "Private program should return 404 to unauthenticated users"
-        finally:
-            paw.api_key = old_key
+        resp = httpx.get(
+            f"{paw.get_api_url()}/api/v1/programs/{program.id}",
+            timeout=10.0,
+        )
+        assert resp.status_code == 404, "Private program should return 404 to unauthenticated users"
 
     @needs_auth
     def test_compile_public_default(self):
         import httpx
-        old_key = paw.api_key
-        try:
-            paw.api_key = API_KEY
-            program = paw.compile("Public test program for counting words.")
-            assert program.id
+        program = paw.compile("Public test program for counting words.")
+        assert program.id
 
-            resp = httpx.get(
-                f"{paw.api_url}/api/v1/programs/{program.id}",
-                timeout=10.0,
-            )
-            assert resp.status_code == 200, "Public program should be accessible"
-        finally:
-            paw.api_key = old_key
+        resp = httpx.get(
+            f"{paw.get_api_url()}/api/v1/programs/{program.id}",
+            timeout=10.0,
+        )
+        assert resp.status_code == 200, "Public program should be accessible"
 
 
 # ── Phase 11: CLI rename ──
@@ -412,24 +385,19 @@ class TestCLIRename:
     @needs_auth
     def test_cli_rename(self):
         import time
-        old_key = paw.api_key
-        try:
-            paw.api_key = API_KEY
-            program = paw.compile("Test rename program for validation.")
-            slug = f"rename-test-{int(time.time()) % 100000}"
+        program = paw.compile("Test rename program for validation.")
+        slug = f"rename-test-{int(time.time()) % 100000}"
 
-            result = subprocess.run(
-                [sys.executable, "-m", "programasweights.cli",
-                 "--api-key", API_KEY,
-                 "rename", program.id, slug, "--json"],
-                capture_output=True, text=True,
-            )
-            assert result.returncode == 0
-            data = json.loads(result.stdout)
-            assert data.get("slug")
-            assert slug in data["slug"]
-        finally:
-            paw.api_key = old_key
+        result = subprocess.run(
+            [sys.executable, "-m", "programasweights.cli",
+             "--api-key", API_KEY,
+             "rename", program.id, slug, "--json"],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0
+        data = json.loads(result.stdout)
+        assert data.get("slug")
+        assert slug in data["slug"]
 
     @needs_auth
     def test_cli_compile_private(self):
@@ -481,30 +449,20 @@ class TestFunctionAcceptsProgram:
 class TestListPrograms:
     @needs_auth
     def test_list_programs_returns_dict(self):
-        old_key = paw.api_key
-        try:
-            paw.api_key = API_KEY
-            result = paw.list_programs()
-            assert isinstance(result, dict)
-            assert "programs" in result
-            assert "total" in result
-            assert isinstance(result["programs"], list)
-        finally:
-            paw.api_key = old_key
+        result = paw.list_programs()
+        assert isinstance(result, dict)
+        assert "programs" in result
+        assert "total" in result
+        assert isinstance(result["programs"], list)
 
     @needs_auth
     def test_list_programs_has_entries(self):
-        old_key = paw.api_key
-        try:
-            paw.api_key = API_KEY
-            result = paw.list_programs(per_page=5)
-            assert len(result["programs"]) <= 5
-            if result["programs"]:
-                p = result["programs"][0]
-                assert "id" in p
-                assert "spec" in p
-        finally:
-            paw.api_key = old_key
+        result = paw.list_programs(per_page=5)
+        assert len(result["programs"]) <= 5
+        if result["programs"]:
+            p = result["programs"][0]
+            assert "id" in p
+            assert "spec" in p
 
 
 class TestStderrSuppression:

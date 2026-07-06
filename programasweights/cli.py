@@ -19,10 +19,6 @@ import sys
 
 def cmd_compile(args):
     import programasweights as paw
-    if args.api_url:
-        paw.api_url = args.api_url
-    if args.api_key:
-        paw.api_key = args.api_key
 
     if not args.json:
         print(f"Compiling: {args.spec[:80]}...")
@@ -63,10 +59,6 @@ def cmd_compile(args):
 
 def cmd_run(args):
     import programasweights as paw
-    if args.api_url:
-        paw.api_url = args.api_url
-    if args.api_key:
-        paw.api_key = args.api_key
 
     fn = paw.function(
         args.program, verbose=args.verbose,
@@ -82,22 +74,14 @@ def cmd_run(args):
 
 def cmd_login(args):
     import programasweights as paw
-    if args.api_url:
-        paw.api_url = args.api_url
     paw.login(args.key)
     return 0
 
 
 def cmd_rename(args):
-    import programasweights as paw
-    if args.api_url:
-        paw.api_url = args.api_url
-    if args.api_key:
-        paw.api_key = args.api_key
-
     import httpx
     from programasweights.client import PAWClient
-    client = PAWClient(api_url=paw.api_url, api_key=paw.api_key)
+    client = PAWClient(api_url=args.api_url, api_key=args.api_key)
 
     resp = httpx.patch(
         f"{client._api_url}/api/v1/programs/{args.program}",
@@ -120,14 +104,8 @@ def cmd_rename(args):
 
 
 def cmd_info(args):
-    import programasweights as paw
-    if args.api_url:
-        paw.api_url = args.api_url
-    if args.api_key:
-        paw.api_key = args.api_key
-
     from programasweights.client import PAWClient
-    client = PAWClient(api_url=paw.api_url, api_key=paw.api_key)
+    client = PAWClient(api_url=args.api_url, api_key=args.api_key)
 
     try:
         meta = client.get_program_meta(args.program)

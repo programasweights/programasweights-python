@@ -31,20 +31,35 @@ paw compile --spec "Classify message urgency" [--compiler paw-4b-qwen3-0.6b] [--
 
 ## `paw run`
 
-Run inference locally against a compiled program.
+Run inference locally against a compiled program (the normal mode), or
+explicitly against a bare base interpreter (advanced mode).
 
 ```bash
-paw run --program <id_or_slug> --input "your text" [--max-tokens 512] [--temperature 0.0] [--json]
+paw run --program <id_or_slug> --input "your text" [--offline] [--json]
+
+# Advanced adapter-free mode
+paw run --base --interpreter gpt2 --input "raw prompt" [--offline] [--json]
 ```
 
 | Option | Description |
 |--------|-------------|
 | `--program` | Program hash ID, slug (e.g. `da03/my-classifier`), or official name (e.g. `email-triage`). |
+| `--base` | Select adapter-free base mode. Mutually exclusive with `--program` and requires `--interpreter`. |
+| `--interpreter` | Base interpreter: `Qwen/Qwen3-0.6B` or `gpt2`. Only valid with `--base`. |
 | `--input` | Input text for the program. |
 | `--max-tokens` | Maximum tokens to generate (default: 512). |
 | `--temperature` | Sampling temperature (default: 0.0). |
 | `--verbose` | Print llama.cpp debug output. |
-| `--json` | JSON output with `program`, `input`, `output`. |
+| `--offline` | Require all selected assets to already be cached and make zero network calls. |
+| `--json` | JSON output with `mode`, `program`, `interpreter`, `input`, and `output`. |
+
+Exactly one of `--program` and `--base` is required. An empty or
+whitespace-only `--program` is rejected. Base mode makes no PAW API, slug,
+program, adapter, or prefix-cache calls; online it may download only the
+selected base GGUF. It resets state and tokenizes the complete versioned
+runtime prompt on every invocation. See the
+[Python SDK reference](python-sdk.md#advanced-adapter-free-base-interpreter)
+for the exact prompt bytes and error semantics.
 
 ## `paw rename`
 

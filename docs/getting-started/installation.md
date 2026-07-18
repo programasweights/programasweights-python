@@ -11,6 +11,10 @@ The `--extra-index-url` flag provides pre-built binaries for `llama-cpp-python`,
 ## Requirements
 
 - **Python:** 3.9 through 3.13.
+- **Local runtime:** `llama-cpp-python` is installed with the package.
+
+GPU offload defaults to all available layers (`n_gpu_layers=-1`). Set
+`PAW_GPU_LAYERS=0` to force CPU-only execution.
 
 ## Anaconda on Linux: OpenMP / libgomp errors
 
@@ -26,6 +30,20 @@ CMAKE_ARGS="-DGGML_OPENMP=OFF" pip install programasweights --extra-index-url ht
 |----------|---------|
 | `~/.cache/programasweights/` | Downloaded models and compiled programs |
 | `~/.config/programasweights/` | Local configuration |
+
+Program bundles, runtime manifests, slug mappings, and base models are
+validated before use and installed with atomic cache updates. Built-in base
+models must match their pinned Hugging Face LFS byte size and SHA-256 digest
+and have GGUF magic; adapters must also be nontrivial GGUF files. To prohibit
+all network access, pass `offline=True` to
+`paw.function`/`paw.prepare_program` or set:
+
+```bash
+export PAW_OFFLINE=1
+```
+
+Offline mode fails clearly when any required validated bundle, runtime
+manifest, adapter, or base-model file is missing.
 
 ## Verify the install
 

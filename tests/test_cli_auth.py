@@ -184,3 +184,82 @@ def test_login_flag_plumbing(monkeypatch):
     cli.cmd_login(args)
     assert seen["api_url"] == "http://test.local"
     assert seen["key"] == "paw_sk_test"
+
+
+def test_run_base_json_and_offline_routing(monkeypatch, capsys):
+    seen = {}
+
+    class FakeFunction:
+        interpreter = "gpt2"
+
+        def __call__(self, input_text, **kwargs):
+            seen["call"] = (input_text, kwargs)
+            return "base output"
+
+    def fake_function(program_id, **kwargs):
+        seen["load"] = (program_id, kwargs)
+        return FakeFunction()
+
+    monkeypatch.setattr(paw, "function", fake_function)
+    args = SimpleNamespace(
+        program=None,
+        base=True,
+        interpreter="gpt2",
+        offline=True,
+        input="hello",
+        max_tokens=7,
+        temperature=0.25,
+        verbose=False,
+        api_url=None,
+        api_key=None,
+        json=True,
+    )
+
+    assert cli.cmd_run(args) == 0
+    assert seen["load"] == (
+        None,
+        {
+            "verbose": False,
+            "offline": True,
+            "interpreter": "gpt2",
+        },
+    )
+    payload = __import__("json").loads(capsys.readouterr().out)
+    assert payload == {
+        "mode": "base",
+        "program": None,
+        "interpreter": "gpt2",
+        "input": "hello",
+        "output": "base output",
+    }
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["run", "--program", "", "--input", "x"],
+        ["run", "--base", "--input", "x"],
+        [
+            "run",
+            "--program",
+            "program-id",
+            "--interpreter",
+            "gpt2",
+            "--input",
+            "x",
+        ],
+        [
+            "run",
+            "--program",
+            "program-id",
+            "--base",
+            "--input",
+            "x",
+        ],
+    ],
+)
+def test_run_cli_rejects_invalid_mode_combinations(monkeypatch, arguments):
+    monkeypatch.setattr("sys.argv", ["paw", *arguments])
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main()
+    assert exc_info.value.code == 2

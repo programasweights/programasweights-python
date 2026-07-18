@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.4 (2026-07-18)
+
+- Add desktop preparation and cache inspection APIs with structured progress:
+  `prepare_program`, `is_offline_ready`, and `list_cached_programs`.
+- Make program/runtime/model caching strict and race-safe: immutable IDs win
+  over slugs, streamed bundles are bounded and validated before atomic
+  installation, runtime manifests are versioned, prefix state is atomically
+  locked, and known GGUF runtimes enforce canonical size/SHA-256 metadata.
+- Enforce true offline behavior through `offline=True` or `PAW_OFFLINE=1`;
+  missing assets now fail clearly without a network call.
+- Add precheck, explicit-finetune `compile_async`, status, and cancellation
+  helpers for long-running compiles. Async compilation now requires a compiler
+  and exposes ready slug/version metadata in its typed responses.
+- Extend `paw run` with mutually exclusive compiled/base routing, `--offline`,
+  and mode/program/interpreter fields in JSON output.
+- Add an advanced, explicit adapter-free path with
+  `paw.function(None, interpreter=...)` for Qwen3-0.6B and GPT-2. It uses
+  versioned built-in prompts and never silently replaces compiled execution.
+- Expand hermetic cache/runtime/CLI tests, add a fake-llama base-runtime suite,
+  and test Python 3.9 through 3.13 in CI.
+
 ## 0.4.3 (2026-07-06)
 
 - Fix `paw info` / `paw rename` crashing with `AttributeError` when run without

@@ -7,6 +7,23 @@ from __future__ import annotations
 
 import os
 import sys
+from typing import Callable, TypedDict
+
+
+class ProgressEvent(TypedDict, total=False):
+    """Structured progress update emitted by preparation/download APIs."""
+
+    stage: str
+    status: str
+    message: str
+    program_id: str
+    runtime_id: str
+    path: str
+    downloaded_bytes: int
+    total_bytes: int
+
+
+ProgressCallback = Callable[[ProgressEvent], None]
 
 
 def _quiet() -> bool:
@@ -32,3 +49,15 @@ def status_end() -> None:
     if _quiet():
         return
     print(file=sys.stderr, flush=True)
+
+
+def report_progress(
+    progress: ProgressCallback | None,
+    event: ProgressEvent,
+    fallback_message: str | None = None,
+) -> None:
+    """Send a structured event, or preserve the existing stderr fallback."""
+    if progress is not None:
+        progress(event)
+    elif fallback_message is not None:
+        status(fallback_message)

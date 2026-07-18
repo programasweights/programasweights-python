@@ -53,6 +53,29 @@ If you need to inspect available compiler aliases programmatically, use `paw.lis
 
 GPU acceleration is enabled by default (Metal on Mac, CUDA on Linux, falls back to CPU). Set `PAW_GPU_LAYERS=0` to force CPU if GPU causes issues.
 
+## Desktop and Offline Workflows
+
+Prepare and inspect validated local assets without keeping a model loaded:
+
+```python
+prepared = paw.prepare_program("da03/my-classifier")
+assert prepared["offline_ready"]
+
+fn = paw.function("da03/my-classifier", offline=True)
+cached = paw.list_cached_programs()
+```
+
+`offline=True` (or `PAW_OFFLINE=1`) makes zero network calls and fails clearly
+if a required validated program, runtime, adapter, or base model is missing. Long-running
+finetune compiles can be queued with
+`paw.compile_async(spec, compiler="paw-ft-bs48")`; an explicit finetune
+compiler is required.
+
+Advanced adapter-free inference is available with
+`paw.function(None, interpreter="gpt2")`; see the
+[Python API reference](docs/api-reference/python-sdk.md#advanced-adapter-free-base-interpreter)
+for its intentionally strict semantics.
+
 ## Browser SDK
 
 Programs compiled with GPT-2 also run in the browser via WebAssembly. The initial model and program assets download automatically; inference then runs client-side.
@@ -110,6 +133,7 @@ Generate API keys at [programasweights.com/settings](https://programasweights.co
 ```bash
 paw compile --spec "Extract error lines from logs" --json
 paw run --program <program_id> --input "[ERROR] timeout" --json
+paw run --program <program_id> --input "[ERROR] timeout" --offline --json
 paw login
 ```
 

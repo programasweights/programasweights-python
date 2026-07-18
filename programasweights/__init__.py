@@ -27,8 +27,17 @@ try:
     from importlib.metadata import version as _meta_version
     __version__ = _meta_version("programasweights")
 except Exception:
-    __version__ = "0.4.3"
+    __version__ = "0.4.4"
 
+from ._output import ProgressCallback, ProgressEvent, report_progress
+from .cache import CachedProgram
+from .client import (
+    CompileCancellation,
+    CompileJob,
+    CompilePrecheck,
+    CompileStatus,
+    Program,
+)
 from .config import get_api_url, get_api_key, set_api_key
 
 
@@ -40,7 +49,7 @@ def compile(
     public: bool = True,
     slug: str | None = None,
     ephemeral: bool = False,
-):
+) -> Program:
     """Compile a natural language specification into a neural program.
 
     The compilation runs on the PAW server. The resulting program can be
@@ -87,14 +96,309 @@ def compile(
     return result
 
 
+def precheck_compile(
+    spec: str,
+    compiler: str | None = None,
+) -> CompilePrecheck:
+    """Check whether a compile is cached and inspect current queue state."""
+    from .client import PAWClient
+
+    client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
+    return client.precheck_compile(spec, compiler=compiler)
+
+
+def compile_async(
+    spec: str,
+    compiler: str,
+    name: str | None = None,
+    tags: list[str] | None = None,
+    public: bool = True,
+    slug: str | None = None,
+    ephemeral: bool = False,
+) -> CompileJob:
+    """Queue a finetune compile and return immediately with a job ID.
+
+    ``compiler`` is required because the asynchronous endpoint only supports
+    explicit finetune compilers.
+    """
+    from .client import PAWClient
+
+    client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
+    return client.compile_async(
+        spec,
+        compiler=compiler,
+        name=name,
+        tags=tags,
+        public=public,
+        slug=slug,
+        ephemeral=ephemeral,
+    )
+
+
+def get_compile_status(job_id: str) -> CompileStatus:
+    """Get live status for an asynchronous compile job."""
+    from .client import PAWClient
+
+    client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
+    return client.get_compile_status(job_id)
+
+
+def cancel_compile(job_id: str) -> CompileCancellation:
+    """Cancel a queued asynchronous compile job."""
+    from .client import PAWClient
+
+    client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
+    return client.cancel_compile(job_id)
+
+
+def _coerce_program_reference(program_id_or_slug) -> str:
+    if hasattr(program_id_or_slug, "id"):
+        program_id_or_slug = program_id_or_slug.id
+    if not isinstance(program_id_or_slug, str):
+        raise TypeError("program_id_or_slug must be a string or Program")
+    return program_id_or_slug
+
+
+def _offline_requested(offline: bool) -> bool:
+    import os
+
+    return offline or os.environ.get("PAW_OFFLINE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _resolve_program_id(
+    program_id_or_slug: str,
+    *,
+    offline: bool,
+    progress: ProgressCallback | None = None,
+) -> str:
+    import re
+
+    from .cache import (
+        get_cached_slug,
+        is_program_id,
+        save_slug_mapping,
+    )
+
+    if is_program_id(program_id_or_slug):
+        report_progress(
+            progress,
+            {
+                "stage": "resolve",
+                "status": "ready",
+                "program_id": program_id_or_slug,
+            },
+        )
+        return program_id_or_slug
+
+    is_pinned = bool(re.search(r"@v\d+$", program_id_or_slug))
+    cached = get_cached_slug(program_id_or_slug)
+    if (is_pinned or offline) and cached:
+        report_progress(
+            progress,
+            {
+                "stage": "resolve",
+                "status": "cached",
+                "program_id": cached,
+            },
+        )
+        return cached
+
+    if offline:
+        raise RuntimeError(
+            f"No cached version of '{program_id_or_slug}'. Cannot resolve offline. "
+            "Run once with internet to populate the cache."
+        )
+
+    report_progress(
+        progress,
+        {
+            "stage": "resolve",
+            "status": "resolving",
+        },
+        f"Resolving {program_id_or_slug}...",
+    )
+    from .client import PAWClient
+
+    client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
+    try:
+        resolved_id = client.resolve_slug(program_id_or_slug)
+    except Exception:
+        if cached and not is_pinned:
+            report_progress(
+                progress,
+                {
+                    "stage": "resolve",
+                    "status": "cached_fallback",
+                    "program_id": cached,
+                },
+                "Warning: could not reach server, using cached version of "
+                f"{program_id_or_slug}",
+            )
+            return cached
+        raise
+
+    if not is_program_id(resolved_id):
+        raise RuntimeError(
+            f"Server returned invalid program ID for '{program_id_or_slug}'."
+        )
+    save_slug_mapping(program_id_or_slug, resolved_id)
+    report_progress(
+        progress,
+        {
+            "stage": "resolve",
+            "status": "ready",
+            "program_id": resolved_id,
+        },
+    )
+    return resolved_id
+
+
+def prepare_program(
+    program_id_or_slug,
+    offline: bool = False,
+    progress: ProgressCallback | None = None,
+) -> CachedProgram:
+    """Prepare a program for later local inference without loading the model.
+
+    Resolves a slug, downloads and validates the program bundle, resolves its
+    runtime manifest, and ensures the exact base-model file is present.
+    """
+    from . import cache
+
+    reference = _coerce_program_reference(program_id_or_slug)
+    offline = _offline_requested(offline)
+    resolved_id = _resolve_program_id(
+        reference,
+        offline=offline,
+        progress=progress,
+    )
+
+    if offline:
+        if not cache.has_valid_program_assets(resolved_id):
+            raise RuntimeError(
+                f"Program {resolved_id} is not fully cached and cannot be "
+                "prepared offline."
+            )
+        report_progress(
+            progress,
+            {
+                "stage": "program",
+                "status": "cached",
+                "program_id": resolved_id,
+                "path": str(cache.get_program_dir(resolved_id)),
+            },
+        )
+    else:
+        from .client import PAWClient
+
+        client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
+        client.download_paw(resolved_id, progress=progress)
+
+    meta = cache.load_cached_program_meta(resolved_id)
+    if meta is None:
+        raise RuntimeError(
+            f"Program {resolved_id} has invalid or incomplete cached metadata."
+        )
+
+    api_url = None if offline else get_api_url()
+    api_key = None if offline else get_api_key()
+    runtime_manifest = cache.resolve_runtime_manifest(
+        meta,
+        api_url=api_url,
+        api_key=api_key,
+        offline=offline,
+    )
+    if runtime_manifest is None:
+        raise RuntimeError(
+            f"Program {resolved_id} has no usable cached runtime manifest."
+        )
+    runtime_id = str(runtime_manifest.get("runtime_id", ""))
+    report_progress(
+        progress,
+        {
+            "stage": "runtime",
+            "status": "ready",
+            "program_id": resolved_id,
+            "runtime_id": runtime_id,
+        },
+    )
+
+    if offline:
+        base_model_path = cache.get_cached_base_model_path(runtime_manifest)
+        if base_model_path is None:
+            raise RuntimeError(
+                f"Base model for runtime '{runtime_id}' is not cached; "
+                "cannot prepare offline."
+            )
+        report_progress(
+            progress,
+            {
+                "stage": "base_model",
+                "status": "cached",
+                "program_id": resolved_id,
+                "runtime_id": runtime_id,
+                "path": str(base_model_path),
+            },
+        )
+    else:
+        interpreter = meta.get("interpreter", "Qwen/Qwen3-0.6B")
+        cache.get_base_model_path(
+            interpreter,
+            runtime_manifest=runtime_manifest,
+            progress=progress,
+        )
+
+    metadata = cache.get_cached_program_metadata(resolved_id)
+    if metadata is None or not metadata["offline_ready"]:
+        raise RuntimeError(
+            f"Program {resolved_id} could not be made ready for offline use."
+        )
+    report_progress(
+        progress,
+        {
+            "stage": "prepare",
+            "status": "ready",
+            "program_id": resolved_id,
+            "runtime_id": runtime_id,
+            "path": metadata["program_dir"],
+        },
+    )
+    return metadata
+
+
+def is_offline_ready(program_id_or_slug) -> bool:
+    """Check local runnable state without making any network calls."""
+    from . import cache
+
+    reference = _coerce_program_reference(program_id_or_slug)
+    resolved_id = cache.resolve_cached_program_id(reference)
+    if resolved_id is None:
+        return False
+    metadata = cache.get_cached_program_metadata(resolved_id)
+    return bool(metadata and metadata["offline_ready"])
+
+
+def list_cached_programs() -> list[CachedProgram]:
+    """Return metadata for valid local program caches."""
+    from .cache import list_cached_programs as _list_cached_programs
+
+    return _list_cached_programs()
+
+
 def function(
     program_id,
     n_ctx: int = 2048,
     n_gpu_layers: int | None = None,
     verbose: bool = False,
     offline: bool = False,
+    *,
+    interpreter: str | None = None,
 ):
-    """Load a compiled program for local inference via llama.cpp.
+    """Load a compiled program, or explicitly load a bare base interpreter.
 
     Downloads the .paw bundle and base model GGUF on first use.
     Subsequent calls use the local cache.
@@ -109,6 +413,9 @@ def function(
         verbose: Print llama.cpp debug output.
         offline: Skip server check for slug resolution and use local cache only.
             Also set via ``PAW_OFFLINE=1`` env var.
+        interpreter: Advanced adapter-free mode. This is only valid when
+            ``program_id`` is explicitly ``None``. Initially supported values
+            are ``"Qwen/Qwen3-0.6B"`` and ``"gpt2"``.
 
     Returns:
         A callable ``PawFunction`` that takes an input string and returns output.
@@ -119,72 +426,70 @@ def function(
         'immediate'
 
         >>> fn = paw.function("da03/my-program@v2")  # pinned version
-    """
-    if hasattr(program_id, 'id'):
-        program_id = program_id.slug or program_id.id
-    import os
-    import re
-    from .cache import is_program_cached, get_program_dir, get_cached_slug, save_slug_mapping
-    from .runtime_llamacpp import PawFunction
 
-    offline = offline or os.environ.get("PAW_OFFLINE", "").strip() in ("1", "true", "yes")
+        >>> base = paw.function(None, interpreter="gpt2")
+    """
+    import os
+    from . import cache
+
+    offline = _offline_requested(offline)
     if n_gpu_layers is None:
         n_gpu_layers = int(os.environ.get("PAW_GPU_LAYERS", "-1"))
 
-    from ._output import status
+    if program_id is None:
+        if interpreter is None:
+            raise ValueError(
+                "program_id=None requires an explicit interpreter."
+            )
+        cache.get_base_runtime_manifest(interpreter)
+        from .runtime_llamacpp import PawFunction
 
-    resolved_id = program_id
-    if not re.fullmatch(r"[a-f0-9]{16,64}", program_id):
-        is_pinned = bool(re.search(r"@v\d+$", program_id))
-        use_offline = offline
+        return PawFunction.from_base(
+            interpreter,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            verbose=verbose,
+            offline=offline,
+        )
 
-        if is_pinned:
-            cached = get_cached_slug(program_id)
-            if cached:
-                resolved_id = cached
-            else:
-                status(f"Resolving {program_id}...")
-                from .client import PAWClient
-                client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
-                resolved_id = client.resolve_slug(program_id)
-                save_slug_mapping(program_id, resolved_id)
-        elif use_offline:
-            cached = get_cached_slug(program_id)
-            if cached:
-                resolved_id = cached
-            else:
-                raise RuntimeError(
-                    f"No cached version of '{program_id}'. Cannot resolve offline. "
-                    "Run once with internet to populate the cache."
-                )
-        else:
-            from .client import PAWClient
-            client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
-            try:
-                status(f"Resolving {program_id}...")
-                resolved_id = client.resolve_slug(program_id)
-                save_slug_mapping(program_id, resolved_id)
-            except Exception:
-                cached = get_cached_slug(program_id)
-                if cached:
-                    status(f"Warning: could not reach server, using cached version of {program_id}")
-                    resolved_id = cached
-                else:
-                    raise
+    program_reference = _coerce_program_reference(program_id)
+    if program_reference == "":
+        raise ValueError(
+            "program_id cannot be an empty string; pass explicit None with "
+            "interpreter=... for adapter-free base mode."
+        )
+    if interpreter is not None:
+        raise ValueError(
+            "interpreter cannot be combined with a compiled program; pass "
+            "program_id=None to request adapter-free base mode."
+        )
 
-    if not is_program_cached(resolved_id):
+    from .runtime_llamacpp import PawFunction
+
+    resolved_id = _resolve_program_id(program_reference, offline=offline)
+    if offline and not cache.has_valid_program_assets(resolved_id):
+        raise RuntimeError(
+            f"Program {resolved_id} is not fully cached; offline mode "
+            "prohibits program downloads."
+        )
+    if not cache.has_valid_program_assets(resolved_id):
         from .client import PAWClient
+
         client = PAWClient(api_url=get_api_url(), api_key=get_api_key())
         client.download_paw(resolved_id)
+    if not cache.has_valid_program_assets(resolved_id):
+        raise RuntimeError(
+            f"Program {resolved_id} is missing valid compiled assets."
+        )
 
-    program_dir = get_program_dir(resolved_id)
+    program_dir = cache.get_program_dir(resolved_id)
     return PawFunction(
         program_dir,
         n_ctx=n_ctx,
         n_gpu_layers=n_gpu_layers,
         verbose=verbose,
-        api_url=get_api_url(),
-        api_key=get_api_key(),
+        api_url=None if offline else get_api_url(),
+        api_key=None if offline else get_api_key(),
         offline=offline,
     )
 
@@ -311,13 +616,28 @@ def list_compilers() -> list[dict]:
 
 
 __all__ = [
+    "CachedProgram",
+    "CompileCancellation",
+    "CompileJob",
+    "CompilePrecheck",
+    "CompileStatus",
+    "Program",
+    "ProgressCallback",
+    "ProgressEvent",
+    "cancel_compile",
     "compile",
     "compile_and_load",
+    "compile_async",
     "function",
+    "get_compile_status",
     "list_compilers",
+    "list_cached_programs",
     "list_programs",
     "list_versions",
     "login",
+    "is_offline_ready",
+    "precheck_compile",
+    "prepare_program",
     "get_api_url",
     "get_api_key",
     "set_api_key",

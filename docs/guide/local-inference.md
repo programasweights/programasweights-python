@@ -22,8 +22,9 @@ Common options exposed by the runtime include:
 | Option | Role |
 |--------|------|
 | `n_ctx` | Context window size (default often **2048**). |
-| `n_gpu_layers` | Offload layers to **Metal** or **CUDA** when available. |
+| `n_gpu_layers` | Offload layers to **Metal** or **CUDA** when available (default **-1**, all layers). |
 | `verbose` | Enable detailed logging from the inference backend. |
+| `offline` | Prohibit network access and require validated cached assets. |
 
 Exact names and defaults follow the SDK; refer to the package API for the authoritative list.
 
@@ -34,6 +35,13 @@ Models and program bundles are stored under:
 `~/.cache/programasweights/`
 
 Manage disk usage by removing cached files there if you need to reclaim space or force a fresh download.
+
+Downloads use unique staging directories and per-program locks. The SDK
+streams `.paw` bytes directly to staging with a compressed-size cap, then
+validates adapter, prompt, metadata, member-count, and expansion limits before
+atomically installing them. Incomplete or stale files are never treated as a
+runnable program. Built-in base GGUFs are checked against canonical pinned byte
+sizes and SHA-256 digests before use.
 
 ## Backend
 

@@ -28,6 +28,14 @@ def _apply_auth_overrides(args):
         os.environ["PAW_API_KEY"] = args.api_key
 
 
+def _non_empty_program(value):
+    if not isinstance(value, str) or not value.strip():
+        raise argparse.ArgumentTypeError(
+            "--program must be a non-empty program ID or slug"
+        )
+    return value
+
+
 def cmd_compile(args):
     import programasweights as paw
     _apply_auth_overrides(args)
@@ -73,13 +81,43 @@ def cmd_run(args):
     import programasweights as paw
     _apply_auth_overrides(args)
 
+    base_mode = bool(getattr(args, "base", False))
+    program = getattr(args, "program", None)
+    interpreter = getattr(args, "interpreter", None)
+    offline = bool(getattr(args, "offline", False))
+    if base_mode:
+        if program is not None:
+            raise ValueError("--base cannot be combined with --program.")
+        if interpreter is None:
+            raise ValueError("--base requires --interpreter.")
+    else:
+        if program is None:
+            raise ValueError("--program is required unless --base is used.")
+        if interpreter is not None:
+            raise ValueError(
+                "--interpreter is only valid together with --base."
+            )
+
     fn = paw.function(
-        args.program, verbose=args.verbose,
+        None if base_mode else program,
+        verbose=args.verbose,
+        offline=offline,
+        interpreter=interpreter,
     )
     result = fn(args.input, max_tokens=args.max_tokens, temperature=args.temperature)
 
     if args.json:
-        print(json.dumps({"program": args.program, "input": args.input, "output": result}))
+        print(
+            json.dumps(
+                {
+                    "mode": "base" if base_mode else "program",
+                    "program": program,
+                    "interpreter": getattr(fn, "interpreter", interpreter),
+                    "input": args.input,
+                    "output": result,
+                }
+            )
+        )
     else:
         print(result)
     return 0
@@ -167,11 +205,31 @@ def main():
     p.add_argument("--json", action="store_true", help="JSON output")
 
     p = sub.add_parser("run", help="Run a program locally via llama.cpp")
-    p.add_argument("--program", required=True, help="Program name or ID")
+    run_mode = p.add_mutually_exclusive_group(required=True)
+    run_mode.add_argument(
+        "--program",
+        type=_non_empty_program,
+        help="Compiled program name or ID",
+    )
+    run_mode.add_argument(
+        "--base",
+        action="store_true",
+        help="Run a bare base model (advanced; requires --interpreter)",
+    )
+    p.add_argument(
+        "--interpreter",
+        choices=("Qwen/Qwen3-0.6B", "gpt2"),
+        help="Base interpreter; only valid with --base",
+    )
     p.add_argument("--input", required=True, help="Input text")
     p.add_argument("--max-tokens", type=int, default=512)
     p.add_argument("--temperature", type=float, default=0.0)
     p.add_argument("--verbose", action="store_true")
+    p.add_argument(
+        "--offline",
+        action="store_true",
+        help="Require all model/program assets to already be cached",
+    )
     p.add_argument("--json", action="store_true", help="JSON output")
 
     p = sub.add_parser("login", help="Save API key for authentication")
@@ -191,6 +249,11 @@ def main():
     if not args.command:
         parser.print_help()
         return 0
+    if args.command == "run":
+        if args.base and args.interpreter is None:
+            parser.error("paw run --base requires --interpreter")
+        if args.program is not None and args.interpreter is not None:
+            parser.error("--interpreter is only valid with --base")
 
     commands = {
         "compile": cmd_compile,

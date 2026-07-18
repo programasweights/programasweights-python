@@ -93,13 +93,18 @@ Output: delete
 - **First call** is usually ~1-5s because it loads the base model. Subsequent calls are typically ~0.05-0.5s depending on input length and GPU availability.
 - **Base model files are shared** across programs on disk. Each Standard LoRA adapter is ~22 MB; each Compact LoRA adapter is ~5 MB.
 - Cache root is `~/.cache/programasweights/`. Override with `PAW_CACHE_DIR`.
-- After the first download, inference works offline.
+- After the first download, inference works offline. Pass `offline=True` or set
+  `PAW_OFFLINE=1` to prohibit network access and fail if any validated asset is
+  missing.
+- Advanced only: `paw.function(None, interpreter="gpt2")` runs a supported
+  base model without a compiled adapter; consult the Python API reference for
+  its strict prompt and offline semantics.
 
 ## Common Errors
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| `RuntimeError: assets not ready` on download | Program is still generating after compile | The SDK polls automatically for up to 30s. If it still fails, retry shortly or recompile. |
+| `RuntimeError: assets not ready` on download | Program is still generating after compile | The SDK polls automatically for up to 60s. If it still fails, retry shortly or recompile. |
 | `httpx.HTTPStatusError: 422` on compile | Spec too short (<10 chars) or request validation failed | Adjust spec length or request shape. |
 | `httpx.HTTPStatusError: 429` | Hosted compile API limit exceeded | Wait, or sign in for higher compile limits. |
 | GPU/Metal errors on load | GPU backend not available or incompatible | Set `PAW_GPU_LAYERS=0` or pass `n_gpu_layers=0` to force CPU. |
@@ -142,7 +147,7 @@ Hosted API limits apply to compile requests. Most inference should run locally t
 
 ## CLI
 
-Commands: `paw compile --spec "..." --json`, `paw run --program <id> --input "..."`, `paw info <id>`, `paw rename <id> <slug>`, `paw login`. All support `--json` for structured output.
+Commands: `paw compile --spec "..." --json`, `paw run --program <id> --input "..." [--offline]`, `paw info <id>`, `paw rename <id> <slug>`, `paw login`. All support `--json` for structured output.
 
 ## Versioning
 
@@ -164,7 +169,7 @@ Pinned versions (`@v1`) are immutable and cached locally forever. Bare slugs alw
 
 ```python
 program = paw.compile(
-    spec,                               # natural language specification (str)
+    spec,                               # natural language specification (10-16000 chars)
     compiler=None,                      # omit to use the current server default (today: paw-4b-qwen3-0.6b)
     slug=None,                          # URL-safe handle (requires auth)
     public=True,                        # list on public hub
@@ -179,7 +184,14 @@ fn = paw.function("da03/my-classifier", offline=True)  # skip server check
 
 result: str = fn(input_text: str, max_tokens=None, temperature=0.0)
 
+prepared = paw.prepare_program("da03/my-classifier")
+ready = paw.is_offline_ready("da03/my-classifier")  # zero network
+cached = paw.list_cached_programs()
+
 fn = paw.compile_and_load(spec)
+
+job = paw.compile_async(spec, compiler="paw-ft-bs48")  # explicit finetune compiler required
+status = paw.get_compile_status(job["job_id"])
 
 versions = paw.list_versions("da03/my-classifier")  # version history
 programs = paw.list_programs(sort="recent", per_page=20)  # requires auth

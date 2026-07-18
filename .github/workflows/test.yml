@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
 
@@ -22,8 +22,8 @@ jobs:
 
       - name: Install (hermetic deps only)
         # Install httpx + pytest and the package itself without pulling the heavy
-        # llama-cpp-python build. The hermetic tests below never import the
-        # llama.cpp runtime (it is imported lazily only when running inference).
+        # llama-cpp-python build. Runtime tests inject a fake llama_cpp module,
+        # so CI needs neither the native extension nor a model download.
         run: |
           python -m pip install --upgrade pip
           python -m pip install httpx pytest
@@ -36,6 +36,8 @@ jobs:
         # be run separately against a live server.
         run: |
           pytest \
+            tests/test_base_interpreter.py \
             tests/test_cli_auth.py \
+            tests/test_desktop_sdk.py \
             tests/test_runtime_registry_sdk.py \
             tests/test_sdk.py::TestInstallAndImport

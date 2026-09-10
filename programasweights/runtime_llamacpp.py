@@ -397,6 +397,7 @@ class PawFunction:
         input_text: str,
         max_tokens: int | None = None,
         temperature: float = 0.0,
+        logits_processor: llama_cpp.LogitsProcessorList | None = None,
     ) -> str:
         """Run the program on an input.
 
@@ -404,6 +405,10 @@ class PawFunction:
             input_text: The input to process.
             max_tokens: Maximum output tokens. None = use all remaining context.
             temperature: Sampling temperature (0 = greedy).
+            logits_processor: Optional llama.cpp logits processors for
+                token-level constrained decoding (for example a regex or
+                JSON-schema processor). Passed straight to llama.cpp and
+                applied to every generated token. None = unconstrained.
 
         Returns:
             The program's output as a string.
@@ -444,6 +449,7 @@ class PawFunction:
                 prompt_tokens,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                logits_processor=logits_processor,
                 token_description="prompt",
             )
 
@@ -459,6 +465,7 @@ class PawFunction:
             input_tokens,
             max_tokens=max_tokens,
             temperature=temperature,
+            logits_processor=logits_processor,
             prior_tokens=self._n_prefix,
             token_description="input",
         )
@@ -469,6 +476,7 @@ class PawFunction:
         *,
         max_tokens: int | None,
         temperature: float,
+        logits_processor: llama_cpp.LogitsProcessorList | None = None,
         prior_tokens: int = 0,
         token_description: str,
     ) -> str:
@@ -491,6 +499,7 @@ class PawFunction:
         for _ in range(gen_limit):
             token = self._llm.sample(
                 temp=temperature if temperature > 0 else 0,
+                logits_processor=logits_processor,
             )
 
             if token == self._llm.token_eos():

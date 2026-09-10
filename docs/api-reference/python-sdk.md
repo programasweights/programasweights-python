@@ -44,7 +44,7 @@ bundle directly. Required runtime metadata and base models are cached for reuse.
 The returned callable:
 
 ```python
-output: str = fn(input_text, max_tokens=None, temperature=0.0)
+output: str = fn(input_text, max_tokens=None, temperature=0.0, logits_processor=None)
 ```
 
 | Parameter | Description |
@@ -52,6 +52,7 @@ output: str = fn(input_text, max_tokens=None, temperature=0.0)
 | `input_text` | Input string for the program. |
 | `max_tokens` | Maximum tokens to generate. `None` (default) = use all remaining context window. |
 | `temperature` | Sampling temperature (default `0.0`). |
+| `logits_processor` | Optional `llama_cpp.LogitsProcessorList` for token-level constrained decoding. Passed straight to llama.cpp and applied to every generated token. `None` (default) samples unconstrained. |
 
 **Context limits:** Spec + input + output share a ~2048 token window. Inputs that exceed it will error. `max_tokens` defaults to `None`: generation runs until EOS or the context limit.
 

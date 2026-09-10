@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add an optional `logits_processor` argument to a compiled or base program
+  call. It is passed straight to llama.cpp's sampler and applied to every
+  generated token, enabling token-level constrained decoding (regex,
+  JSON schema). Defaults to `None`; sampling is unchanged when it is unset.
+
 ## 0.4.5 (2026-09-10)
 
 - Expose structured compile API failures as `paw.APIError`, compatible with

@@ -53,6 +53,15 @@ If you need to inspect available compiler aliases programmatically, use `paw.lis
 
 GPU acceleration is enabled by default (Metal on Mac, CUDA on Linux, falls back to CPU). Set `PAW_GPU_LAYERS=0` to force CPU if GPU causes issues.
 
+## Constrained Decoding
+
+A call accepts an optional `logits_processor`, passed straight to llama.cpp and applied to every generated token. Use it when the output must match a fixed shape (a regex, a JSON schema) rather than only what the spec asks for. It defaults to `None`, which samples exactly as before.
+
+```python
+import llama_cpp
+fn("Office line: +1-555-666-7777", logits_processor=llama_cpp.LogitsProcessorList([my_processor]))
+```
+
 ## Desktop and Offline Workflows
 
 Prepare and inspect validated local assets without keeping a model loaded:

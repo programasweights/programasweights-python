@@ -74,6 +74,7 @@ def fake_runtime(monkeypatch):
             self.input_ids = [0] * 4096
             self.tokenize_calls = []
             self.eval_calls = []
+            self.sample_calls = []
             self.reset_calls = 0
             self.closed = False
             self._sample_index = 0
@@ -94,12 +95,25 @@ def fake_runtime(monkeypatch):
         def eval(self, tokens):
             copied = list(tokens)
             self.eval_calls.append(copied)
+            self.input_ids[self.n_tokens:self.n_tokens + len(copied)] = copied
             self.n_tokens += len(copied)
 
-        def sample(self, *, temp):
+        def sample(self, *, temp, logits_processor=None):
+            self.sample_calls.append(
+                {"temp": temp, "logits_processor": logits_processor}
+            )
             token = ord("A") if self._sample_index == 0 else 0
             self._sample_index += 1
-            return token
+            if logits_processor is None:
+                return token
+            # Mirror llama.cpp: every processor sees the full token
+            # sequence so far and returns the scores to sample from.
+            scores = [0.0] * 256
+            scores[token] = 1.0
+            input_ids = list(self.input_ids[:self.n_tokens])
+            for processor in logits_processor:
+                scores = processor(input_ids, scores)
+            return max(range(len(scores)), key=scores.__getitem__)
 
         def token_eos(self):
             return 0
@@ -111,6 +125,7 @@ def fake_runtime(monkeypatch):
             self.reset_calls += 1
             self.n_tokens = 0
             self._sample_index = 0
+            self.sample_calls = []
 
         def close(self):
             self.closed = True
@@ -144,7 +159,11 @@ def fake_runtime(monkeypatch):
             decoded_path.write_bytes(state.prefix_save_bytes)
         return state.prefix_save_result
 
+    class FakeLogitsProcessorList(list):
+        pass
+
     module.Llama = FakeLlama
+    module.LogitsProcessorList = FakeLogitsProcessorList
     module.llama_adapter_lora_init = adapter_init
     module.llama_set_adapter_lora = adapter_apply
     module.llama_adapter_lora_free = adapter_free
@@ -641,3 +660,84 @@ def test_native_stderr_redirection_is_serialized(
 
     assert max_active == 1
     assert operations == ["open", "open"]
+
+
+def _force_token(token: int):
+    """A llama.cpp logits processor that always selects one token."""
+    seen = []
+
+    def processor(input_ids, scores):
+        seen.append(list(input_ids))
+        forced = list(scores)
+        forced[token] = max(scores) + 1.0
+        return forced
+
+    processor.seen = seen
+    return processor
+
+
+def test_generation_passes_no_logits_processor_by_default(
+    fake_runtime,
+    tmp_path,
+):
+    runtime, state = fake_runtime
+    program_dir = _write_compiled_program(tmp_path)
+
+    fn = runtime.PawFunction(program_dir, offline=True)
+    instance = state.instances[-1]
+
+    assert fn("payload", max_tokens=1) == "A"
+    assert [call["logits_processor"] for call in instance.sample_calls] == [
+        None
+    ]
+    fn.close()
+
+
+def test_compiled_logits_processor_runs_on_every_generated_token(
+    fake_runtime,
+    tmp_path,
+):
+    import llama_cpp
+
+    runtime, state = fake_runtime
+    program_dir = _write_compiled_program(tmp_path)
+
+    fn = runtime.PawFunction(program_dir, offline=True)
+    instance = state.instances[-1]
+    processor = _force_token(ord("B"))
+    processors = llama_cpp.LogitsProcessorList([processor])
+
+    output = fn("payload", max_tokens=3, logits_processor=processors)
+
+    assert output == "BBB"
+    assert [call["logits_processor"] for call in instance.sample_calls] == [
+        processors
+    ] * 3
+    # One call per generated token, each seeing the full sequence so far.
+    assert len(processor.seen) == 3
+    lengths = [len(input_ids) for input_ids in processor.seen]
+    assert lengths == [lengths[0], lengths[0] + 1, lengths[0] + 2]
+    assert [input_ids[-1] for input_ids in processor.seen[1:]] == [
+        ord("B"),
+        ord("B"),
+    ]
+    fn.close()
+
+
+def test_base_logits_processor_is_passed_through(fake_runtime):
+    import llama_cpp
+
+    _, state = fake_runtime
+    _write_base_model("gpt2")
+
+    fn = paw.function(None, interpreter="gpt2")
+    instance = state.instances[-1]
+    processor = _force_token(ord("C"))
+    processors = llama_cpp.LogitsProcessorList([processor])
+
+    assert fn("hello", max_tokens=2, logits_processor=processors) == "CC"
+    assert [call["logits_processor"] for call in instance.sample_calls] == [
+        processors
+    ] * 2
+    assert len(processor.seen) == 2
+    fn.close()

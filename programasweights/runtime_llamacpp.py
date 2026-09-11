@@ -495,11 +495,18 @@ class PawFunction:
         if prompt_tokens:
             self._llm.eval(prompt_tokens)
 
+        # Only forward logits_processor when one was supplied, so the call is
+        # byte-identical to previous releases when it is unset. Some llama.cpp
+        # wrappers and test doubles expose a narrower sample() signature.
+        sample_kwargs = {}
+        if logits_processor is not None:
+            sample_kwargs["logits_processor"] = logits_processor
+
         output_tokens = []
         for _ in range(gen_limit):
             token = self._llm.sample(
                 temp=temperature if temperature > 0 else 0,
-                logits_processor=logits_processor,
+                **sample_kwargs,
             )
 
             if token == self._llm.token_eos():

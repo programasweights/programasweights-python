@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.6 (2026-09-13)
 
 - Add an optional `logits_processor` argument to a compiled or base program
   call for caller-supplied token constraints in llama.cpp's sampler.

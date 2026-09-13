@@ -55,7 +55,7 @@ GPU acceleration is enabled by default (Metal on Mac, CUDA on Linux, falls back 
 
 ## Constrained Decoding
 
-A call accepts an optional `logits_processor`: an advanced hook for caller-supplied llama.cpp-compatible token constraints, not built-in regex or JSON-schema validation. It runs at every generation step. The default, `None`, keeps sampling unchanged.
+In SDK 0.4.6+, a call accepts an optional `logits_processor`: an advanced hook for caller-supplied llama.cpp-compatible token constraints, not built-in regex or JSON-schema validation. It runs at every generation step. The default, `None`, keeps sampling unchanged.
 
 ```python
 import llama_cpp

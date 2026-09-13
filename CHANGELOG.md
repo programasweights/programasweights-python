@@ -3,9 +3,10 @@
 ## Unreleased
 
 - Add an optional `logits_processor` argument to a compiled or base program
-  call. It is passed straight to llama.cpp's sampler and applied to every
-  generated token, enabling token-level constrained decoding (regex,
-  JSON schema). Defaults to `None`; sampling is unchanged when it is unset.
+  call for caller-supplied token constraints in llama.cpp's sampler.
+  Defaults to `None`; sampling is unchanged when it is unset.
+- Propagate processor failures to the caller instead of letting native
+  callback errors silently continue with unconstrained output.
 
 ## 0.4.5 (2026-09-10)
 

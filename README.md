@@ -55,12 +55,15 @@ GPU acceleration is enabled by default (Metal on Mac, CUDA on Linux, falls back 
 
 ## Constrained Decoding
 
-A call accepts an optional `logits_processor`, passed straight to llama.cpp and applied to every generated token. Use it when the output must match a fixed shape (a regex, a JSON schema) rather than only what the spec asks for. It defaults to `None`, which samples exactly as before.
+A call accepts an optional `logits_processor`: an advanced hook for caller-supplied llama.cpp-compatible token constraints, not built-in regex or JSON-schema validation. It runs at every generation step. The default, `None`, keeps sampling unchanged.
 
 ```python
 import llama_cpp
+# my_processor is your compatible callable: (input_ids, scores) -> scores.
 fn("Office line: +1-555-666-7777", logits_processor=llama_cpp.LogitsProcessorList([my_processor]))
 ```
+
+Processors see the full prompt and generated-token history, not just the output. Create or reset stateful processors for each call. Token limits and output whitespace trimming still apply, so validate the returned result.
 
 ## Desktop and Offline Workflows
 

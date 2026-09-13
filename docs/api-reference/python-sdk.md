@@ -52,7 +52,9 @@ output: str = fn(input_text, max_tokens=None, temperature=0.0, logits_processor=
 | `input_text` | Input string for the program. |
 | `max_tokens` | Maximum tokens to generate. `None` (default) = use all remaining context window. |
 | `temperature` | Sampling temperature (default `0.0`). |
-| `logits_processor` | Optional `llama_cpp.LogitsProcessorList` for token-level constrained decoding. Passed straight to llama.cpp and applied to every generated token. `None` (default) samples unconstrained. |
+| `logits_processor` | Optional `llama_cpp.LogitsProcessorList` of caller-supplied processors, applied at every generation step. `None` (default) keeps sampling unchanged. |
+
+This advanced hook is not built-in regex or JSON-schema validation. Each processor takes `(input_ids, scores)` and returns modified scores. Its token history includes the full prompt (including any compiled prefix and suffix or base-model template) plus generated tokens. Create or reset stateful processors for each call; processor exceptions propagate to the caller. Token limits and the usual output whitespace trimming still apply, so validate the returned result.
 
 **Context limits:** Spec + input + output share a ~2048 token window. Inputs that exceed it will error. `max_tokens` defaults to `None`: generation runs until EOS or the context limit.
 

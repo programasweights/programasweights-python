@@ -4,6 +4,7 @@ import ctypes
 import hashlib
 import importlib
 import json
+import math
 import sys
 import threading
 import types
@@ -679,17 +680,23 @@ def _force_token(token: int):
 def test_generation_passes_no_logits_processor_by_default(
     fake_runtime,
     tmp_path,
+    monkeypatch,
 ):
     runtime, state = fake_runtime
     program_dir = _write_compiled_program(tmp_path)
 
     fn = runtime.PawFunction(program_dir, offline=True)
     instance = state.instances[-1]
+    temperatures = []
+
+    def sample_without_processor_keyword(*, temp):
+        temperatures.append(temp)
+        return ord("A")
+
+    monkeypatch.setattr(instance, "sample", sample_without_processor_keyword)
 
     assert fn("payload", max_tokens=1) == "A"
-    assert [call["logits_processor"] for call in instance.sample_calls] == [
-        None
-    ]
+    assert temperatures == [0]
     fn.close()
 
 
@@ -710,34 +717,129 @@ def test_compiled_logits_processor_runs_on_every_generated_token(
     output = fn("payload", max_tokens=3, logits_processor=processors)
 
     assert output == "BBB"
-    assert [call["logits_processor"] for call in instance.sample_calls] == [
-        processors
-    ] * 3
-    # One call per generated token, each seeing the full sequence so far.
-    assert len(processor.seen) == 3
-    lengths = [len(input_ids) for input_ids in processor.seen]
-    assert lengths == [lengths[0], lengths[0] + 1, lengths[0] + 2]
-    assert [input_ids[-1] for input_ids in processor.seen[1:]] == [
-        ord("B"),
-        ord("B"),
+    assert len(instance.sample_calls) == 3
+    assert processor.seen == [
+        list(b"Prefix:payload:Suffix"),
+        list(b"Prefix:payload:SuffixB"),
+        list(b"Prefix:payload:SuffixBB"),
     ]
     fn.close()
 
 
-def test_base_logits_processor_is_passed_through(fake_runtime):
+@pytest.mark.parametrize("interpreter", ["gpt2", "Qwen/Qwen3-0.6B"])
+def test_base_logits_processor_is_passed_through(fake_runtime, interpreter):
     import llama_cpp
 
     _, state = fake_runtime
-    _write_base_model("gpt2")
+    _write_base_model(interpreter)
 
-    fn = paw.function(None, interpreter="gpt2")
+    fn = paw.function(None, interpreter=interpreter)
     instance = state.instances[-1]
     processor = _force_token(ord("C"))
     processors = llama_cpp.LogitsProcessorList([processor])
 
     assert fn("hello", max_tokens=2, logits_processor=processors) == "CC"
-    assert [call["logits_processor"] for call in instance.sample_calls] == [
-        processors
-    ] * 2
-    assert len(processor.seen) == 2
+    assert len(instance.sample_calls) == 2
+    prompt = list(instance.tokenize_calls[0]["data"])
+    assert processor.seen == [prompt, prompt + [ord("C")]]
+    fn.close()
+
+
+def test_logits_processor_can_select_eos(fake_runtime, tmp_path):
+    import llama_cpp
+
+    runtime, state = fake_runtime
+    fn = runtime.PawFunction(_write_compiled_program(tmp_path), offline=True)
+    instance = state.instances[-1]
+    processor = _force_token(instance.token_eos())
+    eval_count = len(instance.eval_calls)
+
+    assert fn(
+        "payload",
+        max_tokens=3,
+        logits_processor=llama_cpp.LogitsProcessorList([processor]),
+    ) == ""
+    assert processor.seen == [list(b"Prefix:payload:Suffix")]
+    assert instance.eval_calls[eval_count:] == [list(b"payload:Suffix")]
+    fn.close()
+
+
+@pytest.mark.parametrize("mode", ["compiled", "base"])
+@pytest.mark.parametrize(
+    "exception_type,invalid_result",
+    [(ValueError, False), (KeyboardInterrupt, False), (SystemExit, False),
+     (TypeError, True)],
+)
+def test_logits_processor_errors_cross_native_callback_safely(
+    fake_runtime, tmp_path, monkeypatch, mode, exception_type, invalid_result,
+):
+    import llama_cpp
+
+    runtime, state = fake_runtime
+    if mode == "compiled":
+        fn = runtime.PawFunction(_write_compiled_program(tmp_path), offline=True)
+        expected_prompt = list(b"payload:Suffix")
+    else:
+        _write_base_model("gpt2")
+        fn = paw.function(None, interpreter="gpt2")
+        expected_prompt = list(b"payload")
+    instance = state.instances[-1]
+    error = exception_type("processor failed")
+    later_calls = []
+    ignored_errors = []
+    native_scores = []
+    decoded_outputs = []
+    monkeypatch.setattr(sys, "unraisablehook", ignored_errors.append)
+
+    def failing_processor(input_ids, scores):
+        scores[:] = [float("-inf")] * len(scores)
+        if invalid_result:
+            # The native scores assignment must also be inside the guard.
+            return object()
+        raise error
+
+    def later_processor(input_ids, scores):
+        later_calls.append(list(input_ids))
+        return scores
+
+    def native_sample(*, temp, logits_processor=None):
+        if logits_processor is None:
+            return ord("A")
+        scores = [0.0] * 256
+        input_ids = list(instance.input_ids[:instance.n_tokens])
+
+        @ctypes.CFUNCTYPE(None)
+        def apply_processors():
+            nonlocal scores
+            for processor in logits_processor:
+                scores = processor(input_ids, scores)
+
+        apply_processors()
+        native_scores.append(list(scores))
+        # The guarded callback must leave native sampling usable, even when
+        # the failed processor has already invalidated every candidate.
+        assert len(scores) == 256 and all(math.isfinite(score) for score in scores)
+        return instance.token_eos()
+
+    def detokenize(tokens):
+        decoded_outputs.append(list(tokens))
+        return bytes(tokens)
+
+    monkeypatch.setattr(instance, "sample", native_sample)
+    monkeypatch.setattr(instance, "detokenize", detokenize)
+    eval_count = len(instance.eval_calls)
+    processors = llama_cpp.LogitsProcessorList([failing_processor, later_processor])
+    with pytest.raises(exception_type) as caught:
+        fn("payload", max_tokens=3, logits_processor=processors)
+
+    if not invalid_result:
+        assert caught.value is error
+    assert ignored_errors == []
+    assert later_calls == []
+    assert len(native_scores) == 1
+    assert instance.eval_calls[eval_count:] == [expected_prompt]
+    assert decoded_outputs == []
+    assert fn("payload", max_tokens=1) == "A"
+    assert len(native_scores) == 1
+    assert later_calls == ignored_errors == []
     fn.close()

@@ -406,9 +406,10 @@ class PawFunction:
             max_tokens: Maximum output tokens. None = use all remaining context.
             temperature: Sampling temperature (0 = greedy).
             logits_processor: Optional llama.cpp logits processors for
-                token-level constrained decoding (for example a regex or
-                JSON-schema processor). Passed straight to llama.cpp and
-                applied to every generated token. None = unconstrained.
+                caller-supplied token constraints, applied at each generation
+                step with the full prompt and generated-token history.
+                Processor errors propagate to the caller. None = unchanged
+                sampling; callers must validate any structured output.
 
         Returns:
             The program's output as a string.
@@ -495,12 +496,31 @@ class PawFunction:
         if prompt_tokens:
             self._llm.eval(prompt_tokens)
 
-        # Only forward logits_processor when one was supplied, so the call is
-        # byte-identical to previous releases when it is unset. Some llama.cpp
-        # wrappers and test doubles expose a narrower sample() signature.
+        # Leave sample() unchanged when no processors were supplied. Native
+        # llama.cpp invokes processors through ctypes, which swallows callback
+        # exceptions, so defer those errors until control returns to Python.
         sample_kwargs = {}
+        processor_error: BaseException | None = None
         if logits_processor is not None:
-            sample_kwargs["logits_processor"] = logits_processor
+            def guarded_processor(input_ids, scores):
+                nonlocal processor_error
+                score_count = len(scores)
+                try:
+                    for processor in logits_processor:
+                        # Match native in-place conversion, including errors
+                        # for invalid processor return shapes or values.
+                        scores[:] = processor(input_ids, scores)
+                    return scores
+                except BaseException as exc:
+                    processor_error = exc
+                    # The processor may have corrupted or made scores
+                    # read-only. Return fresh, finite logits so native sampling
+                    # can finish; its token will be discarded below.
+                    return [0.0] * score_count
+
+            sample_kwargs["logits_processor"] = llama_cpp.LogitsProcessorList(
+                [guarded_processor]
+            )
 
         output_tokens = []
         for _ in range(gen_limit):
@@ -508,6 +528,8 @@ class PawFunction:
                 temp=temperature if temperature > 0 else 0,
                 **sample_kwargs,
             )
+            if processor_error is not None:
+                raise processor_error
 
             if token == self._llm.token_eos():
                 break

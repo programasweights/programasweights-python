@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Add an optional `logits_processor` argument to a compiled or base program
+  call for caller-supplied token constraints in llama.cpp's sampler.
+  Defaults to `None`; sampling is unchanged when it is unset.
+- Propagate processor failures to the caller instead of letting native
+  callback errors silently continue with unconstrained output.
+
 ## 0.4.5 (2026-09-10)
 
 - Expose structured compile API failures as `paw.APIError`, compatible with

@@ -42,7 +42,7 @@ Compile a specification.
 
 ### `POST /infer`
 
-Run inference for a compiled program (server-side execution).
+Use the hosted API for fast inference in around 150 ms, without a local model download.
 
 **Request body (JSON):**
 

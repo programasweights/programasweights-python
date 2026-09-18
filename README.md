@@ -35,6 +35,12 @@ fn("I love this!")  # "positive"
 
 If you specifically want the smaller browser-compatible runtime, pass `compiler="paw-4b-gpt2"`. Otherwise, omit `compiler` and let the server default decide.
 
+## Remote inference (optional)
+
+Use the hosted API for fast inference in around 150 ms, without a local model download.
+
+See the [REST API reference](docs/api-reference/rest-api.md#post-infer) for an example.
+
 ## Current Public Compilers
 
 

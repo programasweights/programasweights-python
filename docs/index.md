@@ -38,6 +38,12 @@ fn = paw.function(program.id)
 fn("{name: 'Alice', age: 30,}")  # '{"name":"Alice","age":30}'
 ```
 
+## Remote inference (optional)
+
+Use the hosted API for fast inference in around 150 ms, without a local model download.
+
+See the [REST API reference](api-reference/rest-api.md#post-infer) for an example.
+
 ## What Can You Build?
 
 PAW is for functions that are easy to describe but hard to code as rules:

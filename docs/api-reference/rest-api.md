@@ -55,6 +55,23 @@ Use the hosted API for fast inference in around 150 ms, without a local model do
 
 **Response (JSON):** includes `output`, `tokens_generated`, and `latency_ms`.
 
+**Example:**
+
+```python
+import httpx
+
+with httpx.Client(timeout=60.0) as client:
+    response = client.post(
+        "https://programasweights.com/api/v1/infer",
+        json={
+            "program_id": "email-triage",
+            "input": "Urgent: server is down!"
+        },
+    )
+    response.raise_for_status()
+    print(response.json()["output"])
+```
+
 ### `GET /programs`
 
 List or search programs.

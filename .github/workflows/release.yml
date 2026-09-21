@@ -30,6 +30,7 @@ jobs:
         run: echo "RELEASE_DIR=$RUNNER_TEMP/verified-release" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:

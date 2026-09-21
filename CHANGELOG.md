@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.8 (2026-09-20)
+
+- Reduce the source distribution to the SDK and files needed to build and
+  document the package.
+
 ## 0.4.7 (2026-09-20)
 
 - Add `remote=True` to `paw.function` and `paw.compile_and_load`, plus

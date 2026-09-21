@@ -13,9 +13,51 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install pytest
+      - run: python -m pip install pytest build
       - name: Test release verification without network or publishing
         run: python -m pytest tests/test_release_metadata.py
+      - name: Check distribution contents
+        run: |
+          python -m build
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import tarfile
+          import tomllib
+          import zipfile
+
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          runtime = set(subprocess.check_output(
+              ["git", "ls-files", "-z", "programasweights"], text=True,
+          ).split("\0")) - {""}
+
+          def check(actual, expected):
+              assert actual == expected, (
+                  f"Unexpected files: {sorted(actual - expected)}; "
+                  f"missing files: {sorted(expected - actual)}"
+              )
+
+          wheel, = Path("dist").glob("*.whl")
+          metadata = {
+              f"programasweights-{version}.dist-info/{name}"
+              for name in (
+                  "METADATA", "WHEEL", "RECORD",
+                  "entry_points.txt", "licenses/LICENSE",
+              )
+          }
+          with zipfile.ZipFile(wheel) as archive:
+              check({name for name in archive.namelist() if not name.endswith("/")},
+                    runtime | metadata)
+
+          sdist, = Path("dist").glob("*.tar.gz")
+          allowed = runtime | {
+              "README.md", "PYPI_README.md", "LICENSE", "CHANGELOG.md",
+              "pyproject.toml", ".gitignore", "PKG-INFO",
+          }
+          with tarfile.open(sdist) as archive:
+              check({member.name for member in archive if not member.isdir()},
+                    {f"programasweights-{version}/{name}" for name in allowed})
+          PY
 
   test:
     runs-on: ubuntu-latest

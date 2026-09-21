@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "programasweights"
-version = "0.4.7"
+version = "0.4.8"
 description = "Compile natural language specifications into neural programs that run locally via llama.cpp."
 readme = "PYPI_README.md"
 requires-python = ">=3.9"
@@ -46,6 +46,16 @@ paw = "programasweights.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["programasweights"]
+
+[tool.hatch.build.targets.sdist]
+only-include = [
+  "programasweights",
+  "README.md",
+  "PYPI_README.md",
+  "LICENSE",
+  "CHANGELOG.md",
+  "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 addopts = "-q"

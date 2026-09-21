@@ -16,6 +16,9 @@ The `--extra-index-url` flag provides pre-built binaries for `llama-cpp-python`,
 GPU offload defaults to all available layers (`n_gpu_layers=-1`). Set
 `PAW_GPU_LAYERS=0` to force CPU-only execution.
 
+The same installation supports [remote inference](../api-reference/python-sdk.md#remote-inference)
+with `paw.function(..., remote=True)`, without downloading local model assets.
+
 ## Anaconda on Linux: OpenMP / libgomp errors
 
 If the build fails with `libgomp`-related errors, disable OpenMP:

@@ -42,7 +42,15 @@ fn("{name: 'Alice', age: 30,}")  # '{"name":"Alice","age":30}'
 
 Use the hosted API for fast inference in around 150 ms, without a local model download.
 
-See the [REST API reference](api-reference/rest-api.md#post-infer) for an example.
+```python
+import programasweights as paw
+
+with paw.function("email-triage", remote=True) as remote_fn:
+    print(remote_fn("Urgent: the server is down!"))
+```
+
+See the [Python SDK reference](api-reference/python-sdk.md#remote-inference)
+or use the [REST API](api-reference/rest-api.md#post-infer) directly.
 
 ## What Can You Build?
 

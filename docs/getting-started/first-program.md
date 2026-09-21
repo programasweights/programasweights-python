@@ -20,6 +20,17 @@ print(result)
 
 The first call may download the program and runtime assets; later calls use the local cache.
 
+### Optional: remote inference
+
+For fast inference without downloading model assets, pass `remote=True`:
+
+```python
+with paw.function("email-triage", remote=True) as remote_fn:
+    print(remote_fn("Urgent: the server is down!"))
+```
+
+For direct HTTP calls, see the [REST API reference](../api-reference/rest-api.md#post-infer).
+
 ## Step 2: Compile your own program
 
 Describe the behavior you want in natural language, compile it, then load the result by `program_id`:

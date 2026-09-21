@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.7 (2026-09-20)
+
+- Add `remote=True` to `paw.function` and `paw.compile_and_load`, plus
+  `paw run --remote`, for hosted inference without downloading model assets
+  or loading the local runtime. Local inference remains the default.
+- Use server generation defaults unless explicitly overridden. Reuse HTTP
+  connections, support `with` and `.close()`, and preserve structured
+  `paw.APIError` details.
+- Reject remote inference combined with offline mode or incompatible local
+  runtime options.
+
 ## 0.4.6 (2026-09-13)
 
 - Add an optional `logits_processor` argument to a compiled or base program

@@ -4,7 +4,7 @@ ProgramAsWeights CLI.
 
 Usage:
     paw compile --spec "..."       Compile a spec on the server
-    paw run --program <id> --input "..."   Run a program locally
+    paw run --program <id> --input "..."   Run locally (or add --remote)
     paw rename <program> <slug>    Set or change a program's slug
     paw info <program>             Show program metadata
     paw login [key]                Save API key for authentication
@@ -85,6 +85,9 @@ def cmd_run(args):
     program = getattr(args, "program", None)
     interpreter = getattr(args, "interpreter", None)
     offline = bool(getattr(args, "offline", False))
+    remote = bool(getattr(args, "remote", False))
+    if remote and (base_mode or offline):
+        raise ValueError("--remote cannot be combined with --base or --offline.")
     if base_mode:
         if program is not None:
             raise ValueError("--base cannot be combined with --program.")
@@ -98,13 +101,24 @@ def cmd_run(args):
                 "--interpreter is only valid together with --base."
             )
 
-    fn = paw.function(
-        None if base_mode else program,
-        verbose=args.verbose,
-        offline=offline,
-        interpreter=interpreter,
+    load_kwargs = dict(
+        verbose=args.verbose, offline=offline, interpreter=interpreter,
     )
-    result = fn(args.input, max_tokens=args.max_tokens, temperature=args.temperature)
+    if remote:
+        load_kwargs["remote"] = True
+    max_tokens = args.max_tokens
+    temperature = args.temperature
+    if not remote:
+        if max_tokens is None:
+            max_tokens = 512
+        if temperature is None:
+            temperature = 0.0
+    fn = paw.function(None if base_mode else program, **load_kwargs)
+    try:
+        result = fn(args.input, max_tokens=max_tokens, temperature=temperature)
+    finally:
+        if remote:
+            fn.close()
 
     if args.json:
         print(
@@ -204,7 +218,7 @@ def main():
     p.add_argument("--private", action="store_true", help="Make program private (not listed on hub)")
     p.add_argument("--json", action="store_true", help="JSON output")
 
-    p = sub.add_parser("run", help="Run a program locally via llama.cpp")
+    p = sub.add_parser("run", help="Run a program locally or remotely")
     run_mode = p.add_mutually_exclusive_group(required=True)
     run_mode.add_argument(
         "--program",
@@ -222,8 +236,9 @@ def main():
         help="Base interpreter; only valid with --base",
     )
     p.add_argument("--input", required=True, help="Input text")
-    p.add_argument("--max-tokens", type=int, default=512)
-    p.add_argument("--temperature", type=float, default=0.0)
+    p.add_argument("--max-tokens", type=int, default=None)
+    p.add_argument("--temperature", type=float, default=None)
+    p.add_argument("--remote", action="store_true", help="Use hosted inference")
     p.add_argument("--verbose", action="store_true")
     p.add_argument(
         "--offline",
@@ -250,6 +265,8 @@ def main():
         parser.print_help()
         return 0
     if args.command == "run":
+        if args.remote and (args.base or args.offline):
+            parser.error("--remote cannot be combined with --base or --offline")
         if args.base and args.interpreter is None:
             parser.error("paw run --base requires --interpreter")
         if args.program is not None and args.interpreter is not None:

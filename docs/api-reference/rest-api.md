@@ -44,6 +44,9 @@ Compile a specification.
 
 Use the hosted API for fast inference in around 150 ms, without a local model download.
 
+The Python SDK exposes hosted inference through `paw.function(..., remote=True)`.
+See the [remote inference reference](python-sdk.md#remote-inference).
+
 **Request body (JSON):**
 
 | Field | Type | Description |

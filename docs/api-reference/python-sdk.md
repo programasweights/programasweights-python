@@ -24,11 +24,13 @@ fn = paw.function(
     verbose=False,
     offline=False,
     *,
+    remote=False,
     interpreter=None,
 )
 ```
 
-Loads a compiled program and returns a callable. Hub references download the
+Returns a callable for a compiled program. Local inference is the default.
+Hub references download the
 program and base model on first use; local `.paw` files supply the program
 bundle directly. Required runtime metadata and base models are cached for reuse.
 
@@ -39,9 +41,10 @@ bundle directly. Required runtime metadata and base models are cached for reuse.
 | `n_gpu_layers` | GPU layers to offload (`0` = CPU-only, `-1` = all). The default is `-1`, or `PAW_GPU_LAYERS` when set. |
 | `verbose` | Enable verbose logging (default `False`). |
 | `offline` | Use only local files/cache and make zero network calls; fail if required validated assets are missing. `PAW_OFFLINE=1` has the same effect. |
+| `remote` | Run hosted inference without downloading model assets (default `False`). Accepts a `Program` object, ID, or slug. Cannot be combined with offline mode, local file paths, `interpreter`, or non-default local runtime options. |
 | `interpreter` | Advanced adapter-free mode only. Must be passed by keyword and only when `program_id` is explicitly `None`. Supported values are `Qwen/Qwen3-0.6B` and `gpt2`. |
 
-The returned callable:
+For local inference, the returned callable accepts:
 
 ```python
 output: str = fn(input_text, max_tokens=None, temperature=0.0, logits_processor=None)
@@ -66,6 +69,25 @@ magic. Historical manifests for those known runtime IDs are normalized to the
 same canonical integrity metadata, so missing server-side checksum fields
 cannot weaken validation. Missing or failed adapters raise an error; the SDK
 never silently falls back to an unadapted base model.
+
+### Remote inference
+
+```python
+with paw.function("email-triage", remote=True) as remote_fn:
+    output = remote_fn("Urgent: the server is down!")
+```
+
+The callable returns a string and accepts optional `max_tokens` and `temperature`.
+Omitting either argument, or passing `None`, uses the server's default for that
+setting. `logits_processor` is supported only for local inference.
+
+Slugs are resolved once when the function is loaded. The `with` block closes
+the HTTP client; otherwise, call `remote_fn.close()` when finished.
+
+Remote calls use the existing [SDK configuration](#configuration) for the API
+URL and API key. HTTP 4xx/5xx responses raise `paw.APIError`, preserving the
+response status, headers, and structured error details. Transport errors
+propagate unchanged.
 
 ### Loading a local `.paw` file
 
@@ -274,12 +296,21 @@ attempt to load a function when compilation raises.
 ## `paw.compile_and_load`
 
 ```python
-fn = paw.compile_and_load(spec, compiler="paw-4b-qwen3-0.6b", **kwargs)
+fn = paw.compile_and_load(spec, compiler=None, remote=False, **kwargs)
 ```
 
-Convenience method that compiles a spec and immediately loads the result for local inference. Equivalent to `paw.function(paw.compile(spec, ...).id)`. Returns a callable.
+Compiles a spec and returns a callable. Inference runs locally by default.
+Pass `remote=True` for hosted inference without downloading model assets.
 
-Accepts all the same parameters as `paw.compile`.
+Accepts the parameters of `paw.compile`, plus `n_ctx`, `n_gpu_layers`, `verbose`,
+and `remote`. Local runtime options must retain their defaults with `remote=True`.
+
+```python
+with paw.compile_and_load(
+    "Classify sentiment as positive or negative", remote=True,
+) as remote_fn:
+    output = remote_fn("I love this!")
+```
 
 ## `paw.list_programs`
 

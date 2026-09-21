@@ -33,9 +33,13 @@ paw compile --spec "Classify message urgency" [--compiler paw-4b-qwen3-0.6b] [--
 
 Run inference locally against a compiled program (the normal mode), or
 explicitly against a bare base interpreter (advanced mode).
+Add `--remote` for hosted inference without downloading local model assets.
 
 ```bash
 paw run --program <id_or_slug> --input "your text" [--offline] [--json]
+
+# Optional hosted inference
+paw run --program email-triage --input "Urgent: the server is down!" --remote --json
 
 # Advanced adapter-free mode
 paw run --base --interpreter gpt2 --input "raw prompt" [--offline] [--json]
@@ -47,10 +51,11 @@ paw run --base --interpreter gpt2 --input "raw prompt" [--offline] [--json]
 | `--base` | Select adapter-free base mode. Mutually exclusive with `--program` and requires `--interpreter`. |
 | `--interpreter` | Base interpreter: `Qwen/Qwen3-0.6B` or `gpt2`. Only valid with `--base`. |
 | `--input` | Input text for the program. |
-| `--max-tokens` | Maximum tokens to generate (default: 512). |
-| `--temperature` | Sampling temperature (default: 0.0). |
+| `--max-tokens` | Maximum tokens to generate. Local default: 512. Remote inference uses the server default when omitted. |
+| `--temperature` | Sampling temperature. Local default: 0.0. Remote inference uses the server default when omitted. |
 | `--verbose` | Print llama.cpp debug output. |
 | `--offline` | Require all selected assets to already be cached and make zero network calls. |
+| `--remote` | Use hosted inference for `--program`. Incompatible with `--base`, `--offline`, `--verbose`, and `PAW_OFFLINE=1`. |
 | `--json` | JSON output with `mode`, `program`, `interpreter`, `input`, and `output`. |
 
 Exactly one of `--program` and `--base` is required. An empty or

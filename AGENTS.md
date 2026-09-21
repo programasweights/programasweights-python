@@ -47,6 +47,42 @@ Load a local `.paw` file with `paw.function("./classifier.paw")` (SDK 0.4.5+).
 
 If you want the smaller browser-compatible runtime explicitly, pass `compiler="paw-4b-gpt2"`. Otherwise, omit `compiler` and let the server default decide.
 
+## Remote inference (optional)
+
+Use the hosted API for fast inference in around 150 ms, without a local model download.
+
+### Python SDK
+
+```python
+import programasweights as paw
+
+with paw.function("email-triage", remote=True) as remote_fn:
+    print(remote_fn("Urgent: the server is down!"))
+```
+
+For authenticated requests, set `PAW_API_KEY` or use `paw.login()`.
+
+### Direct HTTP
+
+Use `httpx` directly without installing the PAW SDK.
+
+```python
+import httpx
+
+with httpx.Client(timeout=60.0) as client:
+    response = client.post(
+        "https://programasweights.com/api/v1/infer",
+        json={
+            "program_id": "email-triage",
+            "input": "Urgent: server is down!"
+        },
+    )
+    response.raise_for_status()
+    print(response.json()["output"])
+```
+
+For authenticated requests, pass `headers={"X-API-Key": api_key}` to `client.post()`.
+
 ## Current Public Compilers
 
 - **Standard** (`paw-4b-qwen3-0.6b`) — higher accuracy, 594 MB base + ~22 MB/program. This is the current server default.

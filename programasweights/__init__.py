@@ -27,7 +27,7 @@ try:
     from importlib.metadata import version as _meta_version
     __version__ = _meta_version("programasweights")
 except Exception:
-    __version__ = "0.4.6"
+    __version__ = "0.4.7"
 
 from ._output import ProgressCallback, ProgressEvent, report_progress
 from .cache import CachedProgram
@@ -390,6 +390,23 @@ def list_cached_programs() -> list[CachedProgram]:
     return _list_cached_programs()
 
 
+def _validate_remote_options(
+    *,
+    n_ctx: int,
+    n_gpu_layers: int | None,
+    verbose: bool,
+    offline: bool,
+    interpreter: str | None = None,
+) -> None:
+    if offline:
+        raise ValueError("remote=True cannot be combined with offline mode.")
+    if (
+        n_ctx != 2048 or n_gpu_layers is not None
+        or verbose or interpreter is not None
+    ):
+        raise ValueError("Local runtime options cannot be used with remote=True.")
+
+
 def function(
     program_id,
     n_ctx: int = 2048,
@@ -397,13 +414,15 @@ def function(
     verbose: bool = False,
     offline: bool = False,
     *,
+    remote: bool = False,
     interpreter: str | None = None,
 ):
     """Load a compiled program, or explicitly load a bare base interpreter.
 
-    Hub references download the .paw bundle on first use; local paths supply
-    it directly. Required runtime metadata and base models may still download
-    unless offline mode is enabled. Subsequent calls reuse validated caches.
+    For local inference, Hub references download the .paw bundle on first use;
+    local paths supply it directly. Required runtime metadata and base models
+    may still download unless offline mode is enabled. Subsequent calls reuse
+    validated caches.
 
     Args:
         program_id: Program ID (str), slug (``da03/my-program``), pinned version
@@ -418,12 +437,15 @@ def function(
         offline: Prohibit network access. Local bundles may be imported, but
             their runtime and base model must already be available locally.
             Also set via ``PAW_OFFLINE=1`` env var.
+        remote: Run hosted inference without downloading model assets. Accepts
+            program IDs, slugs, pinned versions, and Program objects. Cannot
+            be combined with offline mode or non-default local runtime options.
         interpreter: Advanced adapter-free mode. This is only valid when
             ``program_id`` is explicitly ``None``. Initially supported values
             are ``"Qwen/Qwen3-0.6B"`` and ``"gpt2"``.
 
     Returns:
-        A callable ``PawFunction`` that takes an input string and returns output.
+        A callable that takes an input string and returns an output string.
 
     Example:
         >>> fn = paw.function("email-triage")
@@ -431,6 +453,8 @@ def function(
         'immediate'
 
         >>> fn = paw.function("da03/my-program@v2")  # pinned version
+
+        >>> fn = paw.function("email-triage", remote=True)
 
         >>> fn = paw.function("./classifier.paw")  # local bundle
 
@@ -440,6 +464,22 @@ def function(
     from . import cache
 
     offline = _offline_requested(offline)
+    if remote:
+        _validate_remote_options(
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            verbose=verbose,
+            offline=offline,
+            interpreter=interpreter,
+        )
+        from ._program_reference import local_program_path
+
+        reference = _coerce_program_reference(program_id)
+        if not reference or local_program_path(reference) is not None:
+            raise ValueError("Remote inference requires a program ID or slug.")
+        from ._remote import load_remote_function
+
+        return load_remote_function(reference)
     if n_gpu_layers is None:
         n_gpu_layers = int(os.environ.get("PAW_GPU_LAYERS", "-1"))
 
@@ -567,9 +607,11 @@ def compile_and_load(
     n_ctx: int = 2048,
     n_gpu_layers: int | None = None,
     verbose: bool = False,
+    *,
+    remote: bool = False,
     **compile_kwargs,
 ):
-    """Compile a spec and immediately load it for local inference.
+    """Compile a spec and load it for local or remote inference.
 
     Convenience wrapper that combines ``paw.compile()`` and ``paw.function()``
     into a single call.
@@ -581,18 +623,32 @@ def compile_and_load(
         n_ctx: Context window size for llama.cpp.
         n_gpu_layers: GPU layers (-1 = all, 0 = CPU only).
         verbose: Print llama.cpp debug output.
+        remote: Run hosted inference without downloading model assets.
         **compile_kwargs: Additional args passed to compile (slug, public, etc.)
 
     Returns:
-        A callable ``PawFunction``.
+        A callable that takes an input string and returns output.
 
     Example:
         >>> fn = paw.compile_and_load("Classify sentiment as positive or negative")
         >>> fn("I love this!")
         'positive'
     """
+    if remote:
+        _validate_remote_options(
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+            verbose=verbose,
+            offline=_offline_requested(False),
+        )
     program = compile(spec, compiler=compiler, **compile_kwargs)
-    return function(program, n_ctx=n_ctx, n_gpu_layers=n_gpu_layers, verbose=verbose)
+    return function(
+        program,
+        n_ctx=n_ctx,
+        n_gpu_layers=n_gpu_layers,
+        verbose=verbose,
+        remote=remote,
+    )
 
 
 def list_versions(slug: str) -> dict:

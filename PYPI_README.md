@@ -35,6 +35,19 @@ fn("I love this!")  # "positive"
 
 If you specifically want the smaller browser-compatible runtime, pass `compiler="paw-4b-gpt2"`. Otherwise, omit `compiler` and let the server default decide.
 
+## Remote inference (optional)
+
+Use the hosted API for fast inference in around 150 ms, without a local model download.
+
+```python
+import programasweights as paw
+
+with paw.function("email-triage", remote=True) as remote_fn:
+    print(remote_fn("Urgent: the server is down!"))
+```
+
+For direct HTTP calls, see the [REST API reference](https://programasweights.readthedocs.io/en/latest/api-reference/rest-api/#post-infer).
+
 ## Current Public Compilers
 
 
@@ -158,6 +171,7 @@ Generate API keys at [programasweights.com/settings](https://programasweights.co
 paw compile --spec "Extract error lines from logs" --json
 paw run --program <program_id> --input "[ERROR] timeout" --json
 paw run --program <program_id> --input "[ERROR] timeout" --offline --json
+paw run --program <program_id> --input "[ERROR] timeout" --remote --json
 paw login
 ```
 

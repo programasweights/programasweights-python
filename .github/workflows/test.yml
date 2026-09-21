@@ -52,6 +52,7 @@ jobs:
             tests/test_local_program.py \
             tests/test_base_interpreter.py \
             tests/test_cli_auth.py \
+            tests/test_remote_inference.py \
             tests/test_desktop_sdk.py \
             tests/test_runtime_registry_sdk.py \
             tests/test_sdk.py::TestInstallAndImport
@@ -72,7 +73,7 @@ jobs:
           python -m pip install httpx pytest
           python -m pip install -e . --no-deps
       - name: Test Windows local paths, cache locks, and compile errors
-        run: python -m pytest tests/test_api_errors.py tests/test_compile_timeouts.py tests/test_local_program.py --junitxml=test-results.xml
+        run: python -m pytest tests/test_api_errors.py tests/test_compile_timeouts.py tests/test_local_program.py tests/test_remote_inference.py --junitxml=test-results.xml
       - name: Annotate Windows test failures
         if: failure()
         shell: python

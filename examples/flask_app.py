@@ -17,7 +17,10 @@ import programasweights as paw
 
 app = Flask(__name__)
 
-triage = paw.function("email-triage")
+triage = paw.compile_and_load(
+    "Classify if a message needs immediate attention or can wait. "
+    "Return only 'immediate' or 'wait'."
+)
 json_fixer = paw.function(
     paw.compile(
         "Fix malformed JSON: repair missing quotes and trailing commas",

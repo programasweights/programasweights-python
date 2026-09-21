@@ -5,12 +5,16 @@ functions that run locally.
 Quick start:
     import programasweights as paw
 
-    # Use a pre-compiled function (downloads once, runs locally forever)
-    fn = paw.function("email-triage")
+    # Compile and load your own function
+    fn = paw.compile_and_load(
+        "Classify if a message needs immediate attention or can wait. "
+        "Return only 'immediate' or 'wait'."
+    )
     fn("Urgent: server is down!")  # "immediate"
 
-    # Compile your own from a description
+    # Compile once and save the program ID
     program = paw.compile("Fix malformed JSON: repair missing quotes and trailing commas")
+    print(program.id)  # Save this ID for future runs
     fn = paw.function(program.id)
     fn("{name: 'Alice',}")  # '{"name":"Alice"}'
 

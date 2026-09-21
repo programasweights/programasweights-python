@@ -29,7 +29,10 @@ import programasweights as paw
 
 # --- The new way: ProgramAsWeights ---
 
-triage = paw.function("email-triage")
+triage = paw.compile_and_load(
+    "Classify if a message needs immediate attention or can wait. "
+    "Return only 'immediate' or 'wait'."
+)
 
 test_messages = [
     "Urgent: production database is unresponsive, all writes failing",

@@ -15,22 +15,21 @@ pip install programasweights --extra-index-url https://pypi.programasweights.com
 ```python
 import programasweights as paw
 
-# Use a pre-compiled function (downloads once, runs locally forever)
-fn = paw.function("email-triage")
+# Compile and load your own function
+fn = paw.compile_and_load(
+    "Classify if a message needs immediate attention or can wait. "
+    "Return only 'immediate' or 'wait'."
+)
 fn("Urgent: the server is down!")        # "immediate"
 fn("Newsletter: spring picnic")          # "wait"
 
-# Compile your own from a description
+# Compile once and save the program ID
 program = paw.compile(
-    "Fix malformed JSON: repair missing quotes and trailing commas",
-    slug="json-fixer"              # optional: creates username/json-fixer handle
+    "Fix malformed JSON: repair missing quotes and trailing commas"
 )
-fn = paw.function(program.slug)    # or paw.function(program.id)
+print(program.id)  # Save this ID for future runs
+fn = paw.function(program.id)
 fn("{name: 'Alice',}")  # '{"name":"Alice"}'
-
-# Or compile and load in one step
-fn = paw.compile_and_load("Classify sentiment as positive or negative")
-fn("I love this!")  # "positive"
 ```
 
 If you specifically want the smaller browser-compatible runtime, pass `compiler="paw-4b-gpt2"`. Otherwise, omit `compiler` and let the server default decide.
@@ -42,7 +41,11 @@ Use the hosted API for fast inference in around 150 ms, without a local model do
 ```python
 import programasweights as paw
 
-with paw.function("email-triage", remote=True) as remote_fn:
+with paw.compile_and_load(
+    "Classify if a message needs immediate attention or can wait. "
+    "Return only 'immediate' or 'wait'.",
+    remote=True,
+) as remote_fn:
     print(remote_fn("Urgent: the server is down!"))
 ```
 

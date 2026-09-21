@@ -13,8 +13,11 @@ pip install programasweights --extra-index-url https://pypi.programasweights.com
 ```python
 import programasweights as paw
 
-# Load an official program by name
-fn = paw.function("email-triage")
+# Compile and load your own function
+fn = paw.compile_and_load(
+    "Classify if a message needs immediate attention or can wait. "
+    "Return only 'immediate' or 'wait'."
+)
 
 result = fn("Thesis defense committee needs your signature by EOD")
 print(result)  # "immediate"
@@ -23,7 +26,9 @@ result = fn("Department newsletter: spring picnic next Friday")
 print(result)  # "wait"
 ```
 
-## Compile Your Own
+## Save and Reuse a Program
+
+Compile separately to get a program ID. Save that ID and load it in future runs.
 
 ```python
 import programasweights as paw
@@ -32,6 +37,7 @@ import programasweights as paw
 program = paw.compile(
     "Fix malformed JSON: repair missing quotes and trailing commas"
 )
+print(program.id)  # Save this ID for future runs
 
 # Use the compiled program
 fn = paw.function(program.id)
@@ -45,7 +51,11 @@ Use the hosted API for fast inference in around 150 ms, without a local model do
 ```python
 import programasweights as paw
 
-with paw.function("email-triage", remote=True) as remote_fn:
+with paw.compile_and_load(
+    "Classify if a message needs immediate attention or can wait. "
+    "Return only 'immediate' or 'wait'.",
+    remote=True,
+) as remote_fn:
     print(remote_fn("Urgent: the server is down!"))
 ```
 

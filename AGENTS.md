@@ -26,22 +26,21 @@ pip install programasweights --extra-index-url https://pypi.programasweights.com
 ```python
 import programasweights as paw
 
-# Use a pre-compiled function (downloads once, runs locally forever)
-fn = paw.function("email-triage")
+# Compile your own function and save its ID
+program = paw.compile(
+    "Classify if a message needs immediate attention or can wait. "
+    "Return only 'immediate' or 'wait'."
+)
+print(program.id)  # Save this ID for future runs
+
+# Load once and reuse the function locally
+fn = paw.function(program.id)
 fn("Urgent: server is down!")  # "immediate"
 fn("Newsletter: spring picnic")  # "wait"
-
-# Compile your own from a description
-program = paw.compile(
-    "Fix malformed JSON: repair missing quotes and trailing commas"
-)
-fn = paw.function(program.id)
-fn("{name: 'Alice',}")  # '{"name":"Alice"}'
-
-# Or compile and load in one step
-fn = paw.compile_and_load("Classify sentiment as positive or negative")
-fn("I love this!")  # "positive"
 ```
+
+On future runs, load the saved ID with `paw.function(saved_program_id)`.
+Compile outside request handlers and reuse the loaded function across calls.
 
 Load a local `.paw` file with `paw.function("./classifier.paw")` (SDK 0.4.5+).
 

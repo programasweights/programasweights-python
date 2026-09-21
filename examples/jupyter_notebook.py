@@ -11,7 +11,10 @@ Usage:
 import programasweights as paw
 import pandas as pd
 
-triage = paw.function("email-triage")
+triage = paw.compile_and_load(
+    "Classify if a message needs immediate attention or can wait. "
+    "Return only 'immediate' or 'wait'."
+)
 
 # Cell 2: Process a DataFrame
 data = pd.DataFrame({

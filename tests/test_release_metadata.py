@@ -11,6 +11,8 @@ import zipfile
 
 import pytest
 
+pytest.importorskip("tomllib", reason="Release tooling requires Python 3.11+")
+
 
 _SPEC = importlib.util.spec_from_file_location(
     "release_metadata", Path(__file__).parents[1] / "scripts" / "release_metadata.py",

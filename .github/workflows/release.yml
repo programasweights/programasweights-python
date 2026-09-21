@@ -23,10 +23,11 @@ jobs:
     timeout-minutes: 15
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-      RELEASE_DIR: ${{ runner.temp }}/verified-release
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
+      - name: Set the verification output directory
+        run: echo "RELEASE_DIR=$RUNNER_TEMP/verified-release" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

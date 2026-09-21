@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.9 (2026-09-21)
+
+- Lead quickstarts and examples with compiling your own functions, then
+  saving and reusing program IDs.
+- Reuse loaded functions in the LangChain example and serialize calls to
+  each shared instance.
+
 ## 0.4.8 (2026-09-20)
 
 - Reduce the source distribution to the SDK and files needed to build and

@@ -1,0 +1,71 @@
+name: GitHub release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing stable version tag, e.g. v0.4.6'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      RELEASE_DIR: ${{ runner.temp }}/verified-release
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify the remote tag and both published PyPI artifacts
+        # Tags are pushed before uploading. Wait for the wheel AND sdist;
+        # never announce an unpublished version or rebuild release assets.
+        run: python scripts/release_metadata.py --tag "$RELEASE_TAG" --output-dir "$RELEASE_DIR" --wait-seconds 600
+      - name: Publish the missing GitHub release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
+            echo "Release already exists; preserving its notes and assets."
+          else
+            latest=$(jq -r .latest "$RELEASE_DIR/verified.json")
+            gh release create "$RELEASE_TAG" "$RELEASE_DIR"/artifacts/* \
+              --verify-tag --title "$RELEASE_TAG" \
+              --notes-file "$RELEASE_DIR/notes.md" --latest="$latest"
+          fi
+          gh release view "$RELEASE_TAG" --json tagName,isDraft,isPrerelease,url \
+            | jq -e --arg tag "$RELEASE_TAG" '.tagName == $tag and .isDraft == false and .isPrerelease == false'
+      - name: Verify the uploaded release assets and latest marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release download "$RELEASE_TAG" --pattern 'programasweights-*' \
+            --dir "$RELEASE_DIR/github-assets"
+          for artifact in "$RELEASE_DIR"/artifacts/*; do
+            cmp "$artifact" "$RELEASE_DIR/github-assets/$(basename "$artifact")"
+          done
+          if [ "$(jq -r .latest "$RELEASE_DIR/verified.json")" = true ]; then
+            gh api "repos/$GH_REPO/releases/latest" \
+              | jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag'
+          fi
+      - name: Retain the verification record
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-verification-${{ inputs.tag || github.ref_name }}
+          path: ${{ runner.temp }}/verified-release/verified.json

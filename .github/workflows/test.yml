@@ -6,6 +6,17 @@ on:
   pull_request:
 
 jobs:
+  release-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest
+      - name: Test release verification without network or publishing
+        run: python -m pytest tests/test_release_metadata.py
+
   test:
     runs-on: ubuntu-latest
     strategy:

@@ -1,0 +1,1 @@
+scikit-build-core[pyproject]==1.0.3

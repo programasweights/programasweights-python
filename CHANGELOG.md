@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.10 (2026-09-21)
+
+- Support Python 3.8 through 3.14.
+- Add prebuilt Intel Mac runtimes with Metal acceleration to the PAW
+  package index.
+- Add Python 3.8 runtimes for Apple Silicon, Linux, and Windows, and
+  Python 3.14 runtimes for Windows.
+- Bundle required Visual C++ and OpenMP libraries in the new Windows runtimes.
+
 ## 0.4.9 (2026-09-21)
 
 - Lead quickstarts and examples with compiling your own functions, then

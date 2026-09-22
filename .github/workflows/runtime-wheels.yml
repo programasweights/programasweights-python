@@ -1,0 +1,161 @@
+name: Runtime wheels
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/runtime-wheels.yml
+      - scripts/runtime-wheels/**
+
+permissions:
+  contents: read
+
+jobs:
+  macos-intel:
+    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+    env:
+      CMAKE_ARGS: -C "${{ github.workspace }}/scripts/runtime-wheels/macos-intel.cmake"
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+      ARCHFLAGS: -arch x86_64
+      CMAKE_BUILD_PARALLEL_LEVEL: "4"
+      CC: /usr/bin/clang
+      CXX: /usr/bin/clang++
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+      - name: Install build tools
+        run: python -m pip install -r scripts/runtime-wheels/macos-intel-requirements.txt
+      - name: Build pinned upstream source
+        run: >-
+          python -m pip wheel --no-cache-dir --no-deps --no-build-isolation
+          -r scripts/runtime-wheels/source.txt --wheel-dir wheelhouse
+      - name: Verify installation and offline inference
+        shell: python
+        run: |
+          import pathlib, subprocess, sys, tempfile, venv
+          wheel, = pathlib.Path("wheelhouse").glob("*.whl")
+          tag = "cp%d%d" % sys.version_info[:2]
+          assert wheel.name == f"llama_cpp_python-0.3.19-{tag}-{tag}-macosx_11_0_x86_64.whl"
+          with tempfile.TemporaryDirectory() as root:
+              venv.create(root, with_pip=True)
+              python = str(pathlib.Path(root) / "bin/python")
+              fixtures = str(pathlib.Path(root) / "fixtures")
+              for args in (
+                  ["-m", "pip", "install", str(wheel.resolve()), "."],
+                  ["-m", "pip", "check"],
+                  ["-I", "-c", "import llama_cpp; print(llama_cpp.llama_print_system_info().decode())"],
+                  ["-I", "scripts/runtime-wheels/prepare_native_fixtures.py", fixtures],
+                  ["-I", "scripts/runtime-wheels/check_native_inference.py", fixtures],
+              ):
+                  subprocess.run([python, *args], check=True)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llama-cpp-macos-intel-py${{ matrix.python-version }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.14"]
+    env:
+      CMAKE_GENERATOR: Visual Studio 17 2022
+      CMAKE_GENERATOR_PLATFORM: x64
+      CMAKE_ARGS: -C "${{ github.workspace }}/scripts/runtime-wheels/windows.cmake"
+      CMAKE_BUILD_PARALLEL_LEVEL: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+      - name: Install build tools
+        run: python -m pip install -r scripts/runtime-wheels/windows-requirements.txt
+      - name: Build pinned upstream source
+        run: >-
+          python -m pip wheel --no-cache-dir --no-deps --no-build-isolation
+          -r scripts/runtime-wheels/source.txt --wheel-dir wheelhouse
+      - name: Audit DLLs and verify offline inference
+        shell: python
+        run: |
+          import pathlib, subprocess, sys, tempfile, venv
+          wheel, = pathlib.Path("wheelhouse").glob("*.whl")
+          tag = "cp%d%d" % sys.version_info[:2]
+          assert wheel.name == f"llama_cpp_python-0.3.19-{tag}-{tag}-win_amd64.whl"
+          subprocess.run([
+              sys.executable, "-I", "scripts/runtime-wheels/audit_windows_dependencies.py",
+              str(wheel.resolve()),
+          ], check=True)
+          with tempfile.TemporaryDirectory() as root:
+              venv.create(root, with_pip=True)
+              python = str(pathlib.Path(root) / "Scripts/python.exe")
+              fixtures = str(pathlib.Path(root) / "fixtures")
+              for args in (
+                  ["-m", "pip", "install", str(wheel.resolve()), "."],
+                  ["-m", "pip", "check"],
+                  ["-I", "-c", "import llama_cpp; print(llama_cpp.llama_print_system_info().decode())"],
+                  ["-I", "scripts/runtime-wheels/prepare_native_fixtures.py", fixtures],
+                  ["-I", "scripts/runtime-wheels/check_native_inference.py", fixtures],
+              ):
+                  subprocess.run([python, *args], check=True)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llama-cpp-windows-py${{ matrix.python-version }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+          architecture: x64
+      - name: Build and repair the Python 3.8 wheel
+        run: |
+          docker run --rm --volume "$PWD:/io" --workdir /io \
+            --env CMAKE_GENERATOR="Unix Makefiles" \
+            --env CMAKE_ARGS="-C /io/scripts/runtime-wheels/linux.cmake" \
+            --env CMAKE_BUILD_PARALLEL_LEVEL=4 \
+            quay.io/pypa/manylinux2014_x86_64@sha256:f09bf382e4bcbd5b3cab130f8d0f12dbe474833f95f54182e80e8c0aaa269ff0 \
+            bash -euxo pipefail -c '
+              export PATH="/opt/python/cp38-cp38/bin:$PATH"
+              python -m pip install -r scripts/runtime-wheels/linux-requirements.txt
+              python -m pip wheel --no-cache-dir --no-deps --no-build-isolation \
+                -r scripts/runtime-wheels/source.txt --wheel-dir /tmp/raw-wheels
+              auditwheel repair --plat manylinux2014_x86_64 --only-plat \
+                --wheel-dir wheelhouse /tmp/raw-wheels/*.whl
+            '
+      - name: Verify installation and offline inference
+        shell: python
+        run: |
+          import pathlib, subprocess, tempfile, venv
+          wheel, = pathlib.Path("wheelhouse").glob("*.whl")
+          assert wheel.name == "llama_cpp_python-0.3.19-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+          with tempfile.TemporaryDirectory() as root:
+              venv.create(root, with_pip=True)
+              python = str(pathlib.Path(root) / "bin/python")
+              fixtures = str(pathlib.Path(root) / "fixtures")
+              for args in (
+                  ["-m", "pip", "install", str(wheel.resolve()), "."],
+                  ["-m", "pip", "check"],
+                  ["-I", "-c", "import llama_cpp; print(llama_cpp.llama_print_system_info().decode())"],
+                  ["-I", "scripts/runtime-wheels/prepare_native_fixtures.py", fixtures],
+                  ["-I", "scripts/runtime-wheels/check_native_inference.py", fixtures],
+              ):
+                  subprocess.run([python, *args], check=True)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llama-cpp-linux-py3.8
+          path: wheelhouse/*.whl
+          if-no-files-found: error

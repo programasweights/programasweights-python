@@ -31,7 +31,7 @@ try:
     from importlib.metadata import version as _meta_version
     __version__ = _meta_version("programasweights")
 except Exception:
-    __version__ = "0.4.9"
+    __version__ = "0.4.10"
 
 from ._output import ProgressCallback, ProgressEvent, report_progress
 from .cache import CachedProgram

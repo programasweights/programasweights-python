@@ -1,0 +1,46 @@
+[
+  {
+    "label": "standard",
+    "program_id": "d67162f3ab9562fe2826",
+    "interpreter": "Qwen/Qwen3-0.6B",
+    "bundle": {
+      "url": "https://huggingface.co/programasweights/paw-programs/resolve/b3291dc7e71451fe961b1d88bb36210cefb35bc5/d67162f3ab9562fe2826.paw",
+      "sha256": "34fda627d1460161a37c436b0b6877be3336ab2db43b26dd5897e8444fa7c242",
+      "size_bytes": 22737730
+    },
+    "base": {
+      "url": "https://huggingface.co/programasweights/Qwen3-0.6B-GGUF-Q6_K/resolve/acb0cea5b5dc53c3ddb69092f778ff608a25e58f/qwen3-0.6b-q6_k.gguf",
+      "sha256": "9a16ed5cacba959e63b62e2b6840c3eca2b51c3c3e51d31367ef8e4aafeae33c",
+      "size_bytes": 622733120,
+      "file": "qwen3-0.6b-q6_k.gguf"
+    },
+    "members": {
+      "prompt_template.txt": "37cdd0a5fe862d50e90e5b709774a0341459db839d63fa62b0a7c1f0a676d93e",
+      "pseudo_program.txt": "251dc8f8e5167554277bdbbff484c82df16fd4e8f8c68da1052e814804973cc7",
+      "adapter.gguf": "7aeaed6b69350f0c08302b09e50aa79519563d6a6f218abf618c115a2a65d854",
+      "meta.json": "75f3a700aef74ca15e4d1d59f731b5d7fb77dafae3ff3b42ebd0fa37fa59b136"
+    }
+  },
+  {
+    "label": "compact",
+    "program_id": "3b4e38680509be51f0ff",
+    "interpreter": "gpt2",
+    "bundle": {
+      "url": "https://huggingface.co/programasweights/paw-programs/resolve/b3291dc7e71451fe961b1d88bb36210cefb35bc5/3b4e38680509be51f0ff.paw",
+      "sha256": "ca6f7c1b1bf60d5944f94319ef59e38f1acd3d528f51094b710b4f241d1c8663",
+      "size_bytes": 5317772
+    },
+    "base": {
+      "url": "https://huggingface.co/programasweights/GPT2-GGUF-Q8_0/resolve/2553387c94536808eae60ff34f54ee18cba79ec0/gpt2-q8_0.gguf",
+      "sha256": "0aa260efb2cce9def922e0546b88ad731cf1a68554db73fa2d4a0949cfa958c5",
+      "size_bytes": 139804832,
+      "file": "gpt2-q8_0.gguf"
+    },
+    "members": {
+      "prompt_template.txt": "af4c05af81871736fd9ddd133ccbc7323e315ca4684e2257039825c7d3e5deac",
+      "pseudo_program.txt": "251dc8f8e5167554277bdbbff484c82df16fd4e8f8c68da1052e814804973cc7",
+      "adapter.gguf": "4b8cd3f0eba0409b9089f532cb601393a7e15026f2ac94769326d7388f7fe76a",
+      "meta.json": "206bc5b1adb756add94cc446521deb687036b2ae6a06ee987c62515bf778a7c6"
+    }
+  }
+]

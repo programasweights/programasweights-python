@@ -1,0 +1,3 @@
+set(CMAKE_INSTALL_OPENMP_LIBRARIES TRUE)
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "${SKBUILD_PLATLIB_DIR}/llama_cpp/lib")
+include(InstallRequiredSystemLibraries)

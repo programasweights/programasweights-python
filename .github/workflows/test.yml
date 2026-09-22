@@ -60,11 +60,11 @@ jobs:
           PY
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
@@ -104,7 +104,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -134,3 +134,44 @@ jobs:
                           message = f"{case.get('name')}: {detail[-3500:]}"
                           message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
                           print(f"::error::{message}")
+
+  native-install:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        platform:
+          - {runner: ubuntu-24.04, arch: x64}
+          - {runner: windows-2022, arch: x64}
+          - {runner: macos-14, arch: arm64}
+          - {runner: macos-15-intel, arch: x64}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.platform.arch }}
+      - name: Install SDK wheel and load its native dependency
+        env:
+          EXPECTED_ARCH: ${{ matrix.platform.arch }}
+        shell: python
+        run: |
+          import os, platform, subprocess, sys, venv
+          from pathlib import Path
+          architectures = {"x64": {"x86_64", "amd64"}, "arm64": {"arm64", "aarch64"}}
+          assert platform.machine().lower() in architectures[os.environ["EXPECTED_ARCH"]]
+          root = Path(os.environ["RUNNER_TEMP"]) / "paw-native"
+          venv.create(root, with_pip=True)
+          python = root / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+          def run(*args):
+              subprocess.run([str(python), *args], check=True)
+          run("-m", "pip", "install", "--upgrade", "pip")
+          run("-m", "pip", "wheel", "--no-deps", "--wheel-dir", str(root / "dist"), ".")
+          wheel, = (root / "dist").glob("*.whl")
+          run("-m", "pip", "install", str(wheel), "--extra-index-url",
+              "https://pypi.programasweights.com/simple/", "--only-binary=llama-cpp-python")
+          run("-m", "pip", "check")
+          run("-I", "-c", "import programasweights, llama_cpp; "
+              "print(programasweights.__version__, llama_cpp.__version__); "
+              "print(llama_cpp.llama_print_system_info().decode())")

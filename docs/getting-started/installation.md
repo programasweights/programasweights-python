@@ -6,11 +6,11 @@ Install the ProgramAsWeights SDK from PyPI:
 pip install programasweights --extra-index-url https://pypi.programasweights.com/simple/
 ```
 
-The `--extra-index-url` flag provides pre-built binaries for `llama-cpp-python`, making installation fast (~10 seconds). Without it, the C++ backend compiles from source (~5 minutes).
+The extra index provides prebuilt binaries for fast installation. If no matching binary is available, pip builds the runtime from source.
 
 ## Requirements
 
-- **Python:** 3.9 through 3.13.
+- **Python:** 3.8 through 3.14.
 - **Local runtime:** `llama-cpp-python` is installed with the package.
 
 GPU offload defaults to all available layers (`n_gpu_layers=-1`). Set
@@ -18,6 +18,24 @@ GPU offload defaults to all available layers (`n_gpu_layers=-1`). Set
 
 The same installation supports [remote inference](../api-reference/python-sdk.md#remote-inference)
 with `paw.function(..., remote=True)`, without downloading local model assets.
+
+## Apple Silicon Macs
+
+Use ARM64 Python for native performance and Metal acceleration.
+Check your Python architecture:
+
+```bash
+python -c "import platform; print(platform.machine())"
+```
+
+It should print `arm64`. If it prints `x86_64`, Python is running
+under Rosetta. With Conda, create a native environment:
+
+```bash
+conda create -n paw-arm64 --platform osx-arm64 python=3.12 pip
+conda activate paw-arm64
+python -m pip install programasweights --extra-index-url https://pypi.programasweights.com/simple/
+```
 
 ## Anaconda on Linux: OpenMP / libgomp errors
 

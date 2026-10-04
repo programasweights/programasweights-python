@@ -43,11 +43,36 @@ jobs:
       - name: Verify installation and offline inference
         shell: python
         run: |
-          import pathlib, subprocess, tempfile, venv
+          import pathlib, re, subprocess, tempfile, venv, zipfile
           wheel, = pathlib.Path("wheelhouse").glob("*.whl")
           target = "${{ matrix.platform.deployment-target }}".replace(".", "_")
           assert wheel.name == f"llama_cpp_python-0.3.36-py3-none-macosx_{target}_${{ matrix.platform.wheel-arch }}.whl"
           with tempfile.TemporaryDirectory() as root:
+              native_root = pathlib.Path(root) / "native"
+              with zipfile.ZipFile(wheel) as archive:
+                  archive.extractall(native_root)
+              libraries = [
+                  p for p in native_root.rglob("*")
+                  if p.is_file() and p.suffix in (".dylib", ".so")
+              ]
+              assert libraries, "Wheel contains no native libraries"
+              assert any("libggml-blas" in p.name for p in libraries) == (target == "14_0")
+              minimum_target = target.replace("_", ".")
+              for library in libraries:
+                  architecture = subprocess.check_output(
+                      ["lipo", "-archs", str(library)], text=True
+                  ).strip()
+                  assert architecture == "${{ matrix.platform.wheel-arch }}", (library, architecture)
+                  commands = subprocess.check_output(
+                      ["otool", "-l", str(library)], text=True
+                  )
+                  minima = re.findall(r"^\s*minos ([\d.]+)$", commands, re.MULTILINE)
+                  assert minima in ([minimum_target], [minimum_target + ".0"]), (library, minima)
+                  if target == "11_0":
+                      imports = subprocess.check_output(
+                          ["nm", "-u", str(library)], text=True
+                      )
+                      assert not re.search(r"NEWLAPACK|ILP64", imports, re.IGNORECASE), library
               venv.create(root, with_pip=True)
               python = str(pathlib.Path(root) / "bin/python")
               fixtures = str(pathlib.Path(root) / "fixtures")

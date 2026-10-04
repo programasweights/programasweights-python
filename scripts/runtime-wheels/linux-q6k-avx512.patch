@@ -1,0 +1,10 @@
+--- a/vendor/llama.cpp/ggml/src/ggml-cpu/amx/amx.cpp
++++ b/vendor/llama.cpp/ggml/src/ggml-cpu/amx/amx.cpp
+@@ -170,7 +170,6 @@
+                 break;
+             case GGML_TYPE_Q4_K:
+             case GGML_TYPE_Q5_K:
+-            case GGML_TYPE_Q6_K:
+             case GGML_TYPE_IQ4_XS:
+                 alignment = 256; // QK_K
+                 break;

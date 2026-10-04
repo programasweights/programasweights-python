@@ -1,0 +1,17 @@
+--- a/vendor/llama.cpp/ggml/src/ggml-cpu/amx/mmq.cpp
++++ b/vendor/llama.cpp/ggml/src/ggml-cpu/amx/mmq.cpp
+@@ -220,7 +220,14 @@
+     tc.rows[6] = 16;  tc.colsb[6] = 64;
+     tc.rows[7] = 16;  tc.colsb[7] = 64;
+ 
++#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ == 11
++    // GCC PR114098: GCC 11's intrinsic declares only an 8-byte memory input,
++    // but LDTILECFG reads all 64 bytes. Preserve the entire configuration.
++    static_assert(sizeof(tile_config_t) == 64, "Unexpected AMX tile configuration size");
++    __asm__ volatile ("ldtilecfg\t%X0" :: "m" (tc) : "memory");
++#else
+     _tile_loadconfig(&tc);
++#endif
+     done = true;
+ }
+ 

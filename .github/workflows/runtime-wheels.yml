@@ -96,6 +96,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.14"]
+        runtime-version: ["0.3.20", "0.3.36"]
     env:
       CMAKE_GENERATOR: Visual Studio 17 2022
       CMAKE_GENERATOR_PLATFORM: x64
@@ -112,13 +113,13 @@ jobs:
       - name: Build pinned upstream source
         run: >-
           python -m pip wheel --no-cache-dir --no-deps --no-build-isolation
-          -r scripts/runtime-wheels/sources/0.3.36.txt --wheel-dir wheelhouse
+          -r scripts/runtime-wheels/sources/${{ matrix.runtime-version }}.txt --wheel-dir wheelhouse
       - name: Audit DLLs and verify offline inference
         shell: python
         run: |
           import pathlib, subprocess, sys, tempfile, venv
           wheel, = pathlib.Path("wheelhouse").glob("*.whl")
-          assert wheel.name == "llama_cpp_python-0.3.36-py3-none-win_amd64.whl"
+          assert wheel.name == "llama_cpp_python-${{ matrix.runtime-version }}-py3-none-win_amd64.whl"
           subprocess.run([
               sys.executable, "-I", "scripts/runtime-wheels/audit_windows_dependencies.py",
               str(wheel.resolve()),
@@ -137,7 +138,7 @@ jobs:
                   subprocess.run([python, *args], check=True)
       - uses: actions/upload-artifact@v4
         with:
-          name: llama-cpp-windows-py${{ matrix.python-version }}
+          name: llama-cpp-windows-${{ matrix.runtime-version }}-py${{ matrix.python-version }}
           path: wheelhouse/*.whl
           if-no-files-found: error
 

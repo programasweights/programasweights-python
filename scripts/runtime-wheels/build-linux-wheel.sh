@@ -1,19 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+version=${2:-0.3.36}
+case "$version" in
+    0.3.20|0.3.36)
+        patches=(linux-backend-install-dir linux-backend-packaging
+                 linux-backend-search-path linux-cpu-os-state
+                 linux-amx-permission linux-amx-gcc11)
+        if [[ "$version" == 0.3.20 ]]; then
+            patches+=(linux-backend-init)
+        else
+            patches+=(linux-q6k-avx512)
+        fi
+        ;;
+    *)
+        printf 'Unsupported Linux runtime version: %s\n' "$version" >&2
+        exit 2
+        ;;
+esac
+
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 mkdir -p -- "${1:-wheelhouse}"
 wheelhouse=$(cd -- "${1:-wheelhouse}" && pwd)
 build_dir=$(mktemp -d)
 trap 'rm -rf -- "$build_dir"' EXIT
 
-read -r source_spec < "$script_dir/source.txt"
+read -r source_spec < "$script_dir/sources/$version.txt"
 curl --fail --location --retry 3 --output "$build_dir/source.tar.gz" "${source_spec%%#sha256=*}"
 printf '%s  %s\n' "${source_spec##*#sha256=}" "$build_dir/source.tar.gz" | sha256sum --check
 tar -xzf "$build_dir/source.tar.gz" -C "$build_dir"
-cd "$build_dir/llama_cpp_python-0.3.36"
-for patch_name in linux-backend-install-dir linux-backend-packaging linux-backend-search-path \
-    linux-cpu-os-state linux-amx-permission linux-amx-gcc11 linux-q6k-avx512; do
+cd "$build_dir/llama_cpp_python-$version"
+for patch_name in "${patches[@]}"; do
     patch --batch --fuzz=0 -p1 < "$script_dir/$patch_name.patch"
 done
 

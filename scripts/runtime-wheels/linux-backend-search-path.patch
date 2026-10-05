@@ -19,9 +19,7 @@
  static fs::path backend_filename_prefix() {
  #ifdef _WIN32
      return fs::u8path("ggml-");
-@@ -488,7 +500,14 @@
- #ifdef GGML_BACKEND_DIR
-         search_paths.push_back(fs::u8path(GGML_BACKEND_DIR));
+@@ -490,3 +502,10 @@
  #endif
 -        // default search paths: executable directory, current directory
 +        // Python wheels keep backends beside this library, not the interpreter.
@@ -33,5 +31,3 @@
 +#endif
 +        // Also preserve the executable-directory and current-directory defaults.
          search_paths.push_back(get_executable_path());
-         std::error_code cwd_ec;
-         const fs::path cwd = fs::current_path(cwd_ec);

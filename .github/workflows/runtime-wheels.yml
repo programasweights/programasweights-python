@@ -39,7 +39,7 @@ jobs:
       - name: Build pinned upstream source
         run: >-
           python -m pip wheel --no-cache-dir --no-deps --no-build-isolation
-          -r scripts/runtime-wheels/source.txt --wheel-dir wheelhouse
+          -r scripts/runtime-wheels/sources/0.3.36.txt --wheel-dir wheelhouse
       - name: Verify installation and offline inference
         shell: python
         run: |
@@ -112,7 +112,7 @@ jobs:
       - name: Build pinned upstream source
         run: >-
           python -m pip wheel --no-cache-dir --no-deps --no-build-isolation
-          -r scripts/runtime-wheels/source.txt --wheel-dir wheelhouse
+          -r scripts/runtime-wheels/sources/0.3.36.txt --wheel-dir wheelhouse
       - name: Audit DLLs and verify offline inference
         shell: python
         run: |
@@ -143,6 +143,10 @@ jobs:
 
   linux:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime-version: ["0.3.20", "0.3.36"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -154,13 +158,13 @@ jobs:
           docker run --rm --volume "$PWD:/io" --workdir /io \
             --env CMAKE_BUILD_PARALLEL_LEVEL=4 \
             quay.io/pypa/manylinux2014_x86_64@sha256:f09bf382e4bcbd5b3cab130f8d0f12dbe474833f95f54182e80e8c0aaa269ff0 \
-            bash scripts/runtime-wheels/build-linux-wheel.sh /io/wheelhouse
+            bash scripts/runtime-wheels/build-linux-wheel.sh /io/wheelhouse "${{ matrix.runtime-version }}"
       - name: Verify installation and offline inference
         shell: python
         run: |
           import os, pathlib, re, subprocess, tempfile, venv, zipfile
           wheel, = pathlib.Path("wheelhouse").glob("*.whl")
-          assert wheel.name == "llama_cpp_python-0.3.36-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+          assert wheel.name == "llama_cpp_python-${{ matrix.runtime-version }}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
           with zipfile.ZipFile(wheel) as archive:
               members = archive.namelist()
           assert len(members) == len(set(members)), "Duplicate wheel archive members"
@@ -211,6 +215,6 @@ jobs:
                   subprocess.run([python, *args], check=True)
       - uses: actions/upload-artifact@v4
         with:
-          name: llama-cpp-linux-py3.8
+          name: llama-cpp-linux-${{ matrix.runtime-version }}-py3.8
           path: wheelhouse/*.whl
           if-no-files-found: error

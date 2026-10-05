@@ -214,7 +214,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime-version: ["0.3.20", "0.3.21", "0.3.36"]
+        runtime-version: ["0.3.20", "0.3.21", "0.3.22", "0.3.36"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

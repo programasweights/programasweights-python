@@ -163,7 +163,7 @@ jobs:
       - name: Verify installation and offline inference
         shell: python
         run: |
-          import os, pathlib, re, subprocess, tempfile, venv, zipfile
+          import os, pathlib, re, subprocess, sys, tempfile, zipfile
           wheel, = pathlib.Path("wheelhouse").glob("*.whl")
           assert wheel.name == "llama_cpp_python-${{ matrix.runtime-version }}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
           with zipfile.ZipFile(wheel) as archive:
@@ -202,18 +202,10 @@ jobs:
                           assert all(re.fullmatch(r"\d+(?:\.\d+)+", version) and
                                      tuple(map(int, version.split("."))) <= maximum
                                      for version in required), (name, namespace, required)
-              venv.create(root, with_pip=True)
-              python = str(pathlib.Path(root) / "bin/python")
-              fixtures = str(pathlib.Path(root) / "fixtures")
-              for args in (
-                  ["-m", "pip", "install", str(wheel.resolve()), "."],
-                  ["-m", "pip", "check"],
-                  ["-I", "-c", "import llama_cpp; print(llama_cpp.llama_print_system_info().decode())"],
-                  ["-I", "scripts/runtime-wheels/prepare_native_fixtures.py", fixtures],
-                  ["-I", "scripts/runtime-wheels/check_native_inference.py", fixtures],
-                  ["-I", "scripts/runtime-wheels/check_native_inference.py", fixtures, "--cpu-variant", "x64"],
-              ):
-                  subprocess.run([python, *args], check=True)
+              subprocess.run([
+                  sys.executable, "-I", "scripts/runtime-wheels/check_runtime_wheel.py",
+                  str(wheel.resolve()), "--check-x64",
+              ], check=True)
       - uses: actions/upload-artifact@v4
         with:
           name: llama-cpp-linux-${{ matrix.runtime-version }}-py3.8

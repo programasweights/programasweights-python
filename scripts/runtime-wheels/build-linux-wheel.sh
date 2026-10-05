@@ -3,7 +3,7 @@ set -euo pipefail
 
 version=${2:-0.3.36}
 case "$version" in
-    0.3.20|0.3.21|0.3.22|0.3.36)
+    0.3.20|0.3.21|0.3.22|0.3.23|0.3.36)
         patches=(linux-backend-install-dir linux-backend-packaging
                  linux-backend-search-path linux-cpu-os-state
                  linux-amx-permission linux-amx-gcc11)
@@ -11,7 +11,7 @@ case "$version" in
             patches+=(linux-backend-init)
         elif [[ "$version" == 0.3.21 || "$version" == 0.3.22 ]]; then
             patches+=(linux-backend-init)
-        else
+        elif [[ "$version" == 0.3.36 ]]; then
             patches+=(linux-q6k-avx512)
         fi
         ;;

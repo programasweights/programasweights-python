@@ -34,12 +34,19 @@ def download(asset, path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("cache_dir", type=Path)
+    parser.add_argument("--download-cache", type=Path,
+                        help="Reuse downloaded bundles and base models from this directory.")
     args = parser.parse_args()
+    download_cache = args.download_cache or args.cache_dir
     manifest = Path(__file__).with_name("native-fixtures.json")
     for fixture in json.loads(manifest.read_text(encoding="utf-8")):
         program_id = fixture["program_id"]
-        bundle = download(fixture["bundle"], args.cache_dir / "bundles" / (program_id + ".paw"))
-        download(fixture["base"], args.cache_dir / "base_models" / fixture["base"]["file"])
+        bundle = download(fixture["bundle"], download_cache / "bundles" / (program_id + ".paw"))
+        base = download(fixture["base"], download_cache / "base_models" / fixture["base"]["file"])
+        destination = args.cache_dir / "base_models" / fixture["base"]["file"]
+        if base.resolve() != destination.resolve():
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(base, destination)
         program_dir = args.cache_dir / "programs" / program_id
         program_dir.mkdir(parents=True, exist_ok=True)
         with ZipFile(bundle) as archive:

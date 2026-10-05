@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.11 (2026-10-04)
+
+- Support llama-cpp-python 0.3.36.
+- Add macOS 11+ runtime wheels for Intel and Apple Silicon, with
+  BLAS acceleration on Apple Silicon running macOS 14+.
+- Automatically select optimized CPU backends in Linux x86-64 wheels.
+
 ## 0.4.10 (2026-09-21)
 
 - Support Python 3.8 through 3.14.

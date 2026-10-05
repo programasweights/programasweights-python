@@ -207,9 +207,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        id: py38
         with:
           python-version: "3.8"
           architecture: x64
+      - uses: actions/setup-python@v5
+        id: py39
+        with: {python-version: "3.9", architecture: x64, update-environment: false}
+      - uses: actions/setup-python@v5
+        id: py310
+        with: {python-version: "3.10", architecture: x64, update-environment: false}
+      - uses: actions/setup-python@v5
+        id: py311
+        with: {python-version: "3.11", architecture: x64, update-environment: false}
+      - uses: actions/setup-python@v5
+        id: py312
+        with: {python-version: "3.12", architecture: x64, update-environment: false}
+      - uses: actions/setup-python@v5
+        id: py313
+        with: {python-version: "3.13", architecture: x64, update-environment: false}
+      - uses: actions/setup-python@v5
+        id: py314
+        with: {python-version: "3.14", architecture: x64, update-environment: false}
       - name: Build and repair the Python 3.8 wheel
         run: |
           docker run --rm --volume "$PWD:/io" --workdir /io \
@@ -219,7 +238,7 @@ jobs:
       - name: Verify installation and offline inference
         shell: python
         run: |
-          import os, pathlib, re, subprocess, sys, tempfile, zipfile
+          import os, pathlib, re, subprocess, tempfile, zipfile
           wheel, = pathlib.Path("wheelhouse").glob("*.whl")
           assert wheel.name == "llama_cpp_python-${{ matrix.runtime-version }}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
           with zipfile.ZipFile(wheel) as archive:
@@ -258,12 +277,22 @@ jobs:
                           assert all(re.fullmatch(r"\d+(?:\.\d+)+", version) and
                                      tuple(map(int, version.split("."))) <= maximum
                                      for version in required), (name, namespace, required)
-              subprocess.run([
-                  sys.executable, "-I", "scripts/runtime-wheels/check_runtime_wheel.py",
-                  str(wheel.resolve()), "--check-x64",
-              ], check=True)
+              for python in (
+                  "${{ steps.py38.outputs.python-path }}",
+                  "${{ steps.py39.outputs.python-path }}",
+                  "${{ steps.py310.outputs.python-path }}",
+                  "${{ steps.py311.outputs.python-path }}",
+                  "${{ steps.py312.outputs.python-path }}",
+                  "${{ steps.py313.outputs.python-path }}",
+                  "${{ steps.py314.outputs.python-path }}",
+              ):
+                  subprocess.run([
+                      python, "-I", "scripts/runtime-wheels/check_runtime_wheel.py",
+                      str(wheel.resolve()), "--check-x64",
+                      "--download-cache", str(pathlib.Path(root) / "downloads"),
+                  ], check=True)
       - uses: actions/upload-artifact@v4
         with:
-          name: llama-cpp-linux-${{ matrix.runtime-version }}-py3.8
+          name: llama-cpp-linux-${{ matrix.runtime-version }}
           path: wheelhouse/*.whl
           if-no-files-found: error

@@ -8,7 +8,10 @@ import zipfile
 import pefile
 
 # Windows 10+ components. MSVC and OpenMP redistributables are not OS libraries.
-SYSTEM_DLLS = {"advapi32.dll", "kernel32.dll", "ntdll.dll", "ucrtbase.dll"}
+SYSTEM_DLLS = {
+    "advapi32.dll", "kernel32.dll", "ntdll.dll",
+    "shell32.dll", "ucrtbase.dll", "ws2_32.dll",
+}
 IMPORT_TABLES = ("IMPORT", "DELAY_IMPORT")
 REQUIRED_DLLS = {"llama.dll", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll", "mtmd.dll"}
 

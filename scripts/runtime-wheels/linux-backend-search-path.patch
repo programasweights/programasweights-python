@@ -1,0 +1,37 @@
+--- a/vendor/llama.cpp/ggml/src/ggml-backend-reg.cpp
++++ b/vendor/llama.cpp/ggml/src/ggml-backend-reg.cpp
+@@ -461,6 +461,18 @@
+ #endif
+ }
+ 
++#if defined(__linux__)
++static fs::path get_library_path() {
++    // An internal data address identifies this library without PLT interposition.
++    static int library_anchor;
++    Dl_info info = {};
++    if (dladdr(&library_anchor, &info) != 0 && info.dli_fname && info.dli_fname[0]) {
++        return fs::u8path(info.dli_fname).parent_path();
++    }
++    return {};
++}
++#endif
++
+ static fs::path backend_filename_prefix() {
+ #ifdef _WIN32
+     return fs::u8path("ggml-");
+@@ -488,7 +500,14 @@
+ #ifdef GGML_BACKEND_DIR
+         search_paths.push_back(fs::u8path(GGML_BACKEND_DIR));
+ #endif
+-        // default search paths: executable directory, current directory
++        // Python wheels keep backends beside this library, not the interpreter.
++#if defined(__linux__)
++        const fs::path library_path = get_library_path();
++        if (!library_path.empty()) {
++            search_paths.push_back(library_path);
++        }
++#endif
++        // Also preserve the executable-directory and current-directory defaults.
+         search_paths.push_back(get_executable_path());
+         std::error_code cwd_ec;
+         const fs::path cwd = fs::current_path(cwd_ec);

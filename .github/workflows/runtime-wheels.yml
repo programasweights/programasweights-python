@@ -11,16 +11,20 @@ permissions:
   contents: read
 
 jobs:
-  macos-intel:
-    runs-on: macos-15-intel
+  macos:
+    runs-on: ${{ matrix.platform.runner }}
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        platform:
+          - {name: intel, runner: macos-15-intel, arch: x64, wheel-arch: x86_64, deployment-target: "11.0"}
+          - {name: arm64, runner: macos-15, arch: arm64, wheel-arch: arm64, deployment-target: "11.0"}
+          - {name: arm64-modern, runner: macos-15, arch: arm64, wheel-arch: arm64, deployment-target: "14.0"}
     env:
-      CMAKE_ARGS: -C "${{ github.workspace }}/scripts/runtime-wheels/macos-intel.cmake"
-      MACOSX_DEPLOYMENT_TARGET: "11.0"
-      ARCHFLAGS: -arch x86_64
+      CMAKE_ARGS: -C "${{ github.workspace }}/scripts/runtime-wheels/macos-${{ matrix.platform.name }}.cmake"
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.platform.deployment-target }}
+      ARCHFLAGS: -arch ${{ matrix.platform.wheel-arch }}
       CMAKE_BUILD_PARALLEL_LEVEL: "4"
       CC: /usr/bin/clang
       CXX: /usr/bin/clang++
@@ -29,7 +33,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          architecture: x64
+          architecture: ${{ matrix.platform.arch }}
       - name: Install build tools
         run: python -m pip install -r scripts/runtime-wheels/macos-intel-requirements.txt
       - name: Build pinned upstream source
@@ -39,11 +43,36 @@ jobs:
       - name: Verify installation and offline inference
         shell: python
         run: |
-          import pathlib, subprocess, sys, tempfile, venv
+          import pathlib, re, subprocess, tempfile, venv, zipfile
           wheel, = pathlib.Path("wheelhouse").glob("*.whl")
-          tag = "cp%d%d" % sys.version_info[:2]
-          assert wheel.name == f"llama_cpp_python-0.3.19-{tag}-{tag}-macosx_11_0_x86_64.whl"
+          target = "${{ matrix.platform.deployment-target }}".replace(".", "_")
+          assert wheel.name == f"llama_cpp_python-0.3.36-py3-none-macosx_{target}_${{ matrix.platform.wheel-arch }}.whl"
           with tempfile.TemporaryDirectory() as root:
+              native_root = pathlib.Path(root) / "native"
+              with zipfile.ZipFile(wheel) as archive:
+                  archive.extractall(native_root)
+              libraries = [
+                  p for p in native_root.rglob("*")
+                  if p.is_file() and p.suffix in (".dylib", ".so")
+              ]
+              assert libraries, "Wheel contains no native libraries"
+              assert any("libggml-blas" in p.name for p in libraries) == (target == "14_0")
+              minimum_target = target.replace("_", ".")
+              for library in libraries:
+                  architecture = subprocess.check_output(
+                      ["lipo", "-archs", str(library)], text=True
+                  ).strip()
+                  assert architecture == "${{ matrix.platform.wheel-arch }}", (library, architecture)
+                  commands = subprocess.check_output(
+                      ["otool", "-l", str(library)], text=True
+                  )
+                  minima = re.findall(r"^\s*minos ([\d.]+)$", commands, re.MULTILINE)
+                  assert minima in ([minimum_target], [minimum_target + ".0"]), (library, minima)
+                  if target == "11_0":
+                      imports = subprocess.check_output(
+                          ["nm", "-u", str(library)], text=True
+                      )
+                      assert not re.search(r"NEWLAPACK|ILP64", imports, re.IGNORECASE), library
               venv.create(root, with_pip=True)
               python = str(pathlib.Path(root) / "bin/python")
               fixtures = str(pathlib.Path(root) / "fixtures")
@@ -57,7 +86,7 @@ jobs:
                   subprocess.run([python, *args], check=True)
       - uses: actions/upload-artifact@v4
         with:
-          name: llama-cpp-macos-intel-py${{ matrix.python-version }}
+          name: llama-cpp-macos-${{ matrix.platform.name }}-py${{ matrix.python-version }}
           path: wheelhouse/*.whl
           if-no-files-found: error
 
@@ -89,8 +118,7 @@ jobs:
         run: |
           import pathlib, subprocess, sys, tempfile, venv
           wheel, = pathlib.Path("wheelhouse").glob("*.whl")
-          tag = "cp%d%d" % sys.version_info[:2]
-          assert wheel.name == f"llama_cpp_python-0.3.19-{tag}-{tag}-win_amd64.whl"
+          assert wheel.name == "llama_cpp_python-0.3.36-py3-none-win_amd64.whl"
           subprocess.run([
               sys.executable, "-I", "scripts/runtime-wheels/audit_windows_dependencies.py",
               str(wheel.resolve()),
@@ -124,25 +152,51 @@ jobs:
       - name: Build and repair the Python 3.8 wheel
         run: |
           docker run --rm --volume "$PWD:/io" --workdir /io \
-            --env CMAKE_GENERATOR="Unix Makefiles" \
-            --env CMAKE_ARGS="-C /io/scripts/runtime-wheels/linux.cmake" \
             --env CMAKE_BUILD_PARALLEL_LEVEL=4 \
             quay.io/pypa/manylinux2014_x86_64@sha256:f09bf382e4bcbd5b3cab130f8d0f12dbe474833f95f54182e80e8c0aaa269ff0 \
-            bash -euxo pipefail -c '
-              export PATH="/opt/python/cp38-cp38/bin:$PATH"
-              python -m pip install -r scripts/runtime-wheels/linux-requirements.txt
-              python -m pip wheel --no-cache-dir --no-deps --no-build-isolation \
-                -r scripts/runtime-wheels/source.txt --wheel-dir /tmp/raw-wheels
-              auditwheel repair --plat manylinux2014_x86_64 --only-plat \
-                --wheel-dir wheelhouse /tmp/raw-wheels/*.whl
-            '
+            bash scripts/runtime-wheels/build-linux-wheel.sh /io/wheelhouse
       - name: Verify installation and offline inference
         shell: python
         run: |
-          import pathlib, subprocess, tempfile, venv
+          import os, pathlib, re, subprocess, tempfile, venv, zipfile
           wheel, = pathlib.Path("wheelhouse").glob("*.whl")
-          assert wheel.name == "llama_cpp_python-0.3.19-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+          assert wheel.name == "llama_cpp_python-0.3.36-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+          with zipfile.ZipFile(wheel) as archive:
+              members = archive.namelist()
+          assert len(members) == len(set(members)), "Duplicate wheel archive members"
+          variants = (
+              "x64 sse42 sandybridge ivybridge piledriver haswell skylakex "
+              "cannonlake cascadelake icelake cooperlake zen4 alderlake sapphirerapids"
+          ).split()
+          expected = {"llama_cpp/lib/libggml-cpu-" + name + ".so" for name in variants}
+          modules = {name for name in members
+                     if pathlib.PurePosixPath(name).name.startswith("libggml-cpu-")}
+          assert modules == expected, {"missing": sorted(expected - modules),
+                                       "unexpected": sorted(modules - expected)}
+          for name in ("libggml.so", "libggml-base.so", "libllama.so", "libmtmd.so"):
+              assert "llama_cpp/lib/" + name in members, "Missing runtime library: " + name
           with tempfile.TemporaryDirectory() as root:
+              native_root = pathlib.Path(root) / "native"
+              readelf_env = dict(os.environ, LC_ALL="C")
+              with zipfile.ZipFile(wheel) as archive:
+                  libraries = [name for name in archive.namelist() if re.search(r"\.so(?:\.\d+)*$", name)]
+                  assert libraries, "Wheel contains no native libraries"
+                  for name in libraries:
+                      library = archive.extract(name, native_root)
+                      with open(library, "rb") as binary:
+                          header = binary.read(20)
+                      assert header[:6] == b"\x7fELF\x02\x01" and int.from_bytes(header[18:20], "little") == 62, name
+                      dynamic = subprocess.check_output(["readelf", "-dW", library], text=True, env=readelf_env)
+                      rpaths = re.findall(r"\((?:RPATH|RUNPATH)\).*?\[(.*?)\]", dynamic)
+                      assert all(re.fullmatch(r"\$(?:ORIGIN|\{ORIGIN\})(?:/.*)?", path)
+                                 for entry in rpaths for path in entry.split(":")), (name, rpaths)
+                      versions = subprocess.check_output(["readelf", "--version-info", "-W", library], text=True, env=readelf_env)
+                      needs = re.search(r"(?ms)^Version needs section.*?(?=^Version |\Z)", versions)
+                      for namespace, maximum in (("GLIBC", (2, 17)), ("GLIBCXX", (3, 4, 19)), ("CXXABI", (1, 3, 7))):
+                          required = re.findall(r"\bName: " + namespace + r"_([^\s]+)", needs.group() if needs else "")
+                          assert all(re.fullmatch(r"\d+(?:\.\d+)+", version) and
+                                     tuple(map(int, version.split("."))) <= maximum
+                                     for version in required), (name, namespace, required)
               venv.create(root, with_pip=True)
               python = str(pathlib.Path(root) / "bin/python")
               fixtures = str(pathlib.Path(root) / "fixtures")
@@ -152,6 +206,7 @@ jobs:
                   ["-I", "-c", "import llama_cpp; print(llama_cpp.llama_print_system_info().decode())"],
                   ["-I", "scripts/runtime-wheels/prepare_native_fixtures.py", fixtures],
                   ["-I", "scripts/runtime-wheels/check_native_inference.py", fixtures],
+                  ["-I", "scripts/runtime-wheels/check_native_inference.py", fixtures, "--cpu-variant", "x64"],
               ):
                   subprocess.run([python, *args], check=True)
       - uses: actions/upload-artifact@v4

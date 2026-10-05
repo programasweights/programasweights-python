@@ -1,0 +1,30 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -131,6 +131,12 @@
+     endif()
+ 
+ 
++    # Keep dynamically loaded CPU variants inside the Python package. This is
++    # an install destination only, not a build-machine backend search path.
++    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GGML_BACKEND_DL AND GGML_CPU_ALL_VARIANTS)
++        set(GGML_BACKEND_INSTALL_DIR "${SKBUILD_PLATLIB_DIR}/llama_cpp/lib")
++    endif()
++
+     add_subdirectory(vendor/llama.cpp)
+ 
+     if (WIN32)
+@@ -148,6 +154,14 @@
+     llama_cpp_python_install_target(ggml-blas)
+     llama_cpp_python_install_target(ggml-can)
+     llama_cpp_python_install_target(ggml-cpu)
++    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GGML_BACKEND_DL AND GGML_CPU_ALL_VARIANTS)
++        foreach(backend IN LISTS GGML_AVAILABLE_BACKENDS)
++            if(backend MATCHES "^ggml-cpu-" AND TARGET ${backend})
++                llama_cpp_python_install_target(${backend})
++                set_target_properties(${backend} PROPERTIES INSTALL_RPATH_USE_LINK_PATH FALSE)
++            endif()
++        endforeach()
++    endif()
+     llama_cpp_python_install_target(ggml-cuda)
+     llama_cpp_python_install_target(ggml-hip)
+     llama_cpp_python_install_target(ggml-kompute)

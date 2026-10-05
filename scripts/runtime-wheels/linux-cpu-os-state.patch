@@ -1,0 +1,38 @@
+--- a/vendor/llama.cpp/ggml/src/ggml-cpu/arch/x86/cpu-feats.cpp
++++ b/vendor/llama.cpp/ggml/src/ggml-cpu/arch/x86/cpu-feats.cpp
+@@ -8,2 +8,3 @@
+ 
++#include <cstdint>
+ #include <cstring>
+@@ -263,4 +264,2 @@
+ static int ggml_backend_cpu_x86_score() {
+-    // FIXME: this does not check for OS support
+-
+     int score = 1;
+@@ -321,2 +320,26 @@
+ 
++
++#if defined(GGML_AVX) || defined(GGML_AVX2) || defined(GGML_FMA) || defined(GGML_F16C) || \
++    defined(GGML_AVX_VNNI) || defined(GGML_AVX512) || defined(GGML_AVX512_VBMI) || \
++    defined(GGML_AVX512_VNNI) || defined(GGML_AVX512_BF16) || \
++    defined(GGML_AMX_TILE) || defined(GGML_AMX_INT8) || defined(GGML_AMX_BF16)
++    // XGETBV itself is unsafe until the CPU and OS advertise XSAVE support.
++    if (!is.AVX() || !is.XSAVE() || !is.OSXSAVE()) { return 0; }
++    uint64_t xcr0;
++#ifdef _MSC_VER
++    xcr0 = _xgetbv(0);
++#else
++    uint32_t eax, edx;
++    __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(0));
++    xcr0 = (uint64_t(edx) << 32) | eax;
++#endif
++    // AVX, FMA and F16C all require OS preservation of XMM and YMM state.
++    if ((xcr0 & 0x6) != 0x6) { return 0; }
++#if defined(GGML_AVX512) || defined(GGML_AVX512_VBMI) || \
++    defined(GGML_AVX512_VNNI) || defined(GGML_AVX512_BF16)
++    // AVX-512 additionally requires opmask, ZMM_Hi256 and Hi16_ZMM state.
++    if ((xcr0 & 0xe6) != 0xe6) { return 0; }
++#endif
++#endif
++
+     return score;

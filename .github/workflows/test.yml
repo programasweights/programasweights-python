@@ -144,7 +144,7 @@ jobs:
         platform:
           - {runner: ubuntu-24.04, arch: x64}
           - {runner: windows-2022, arch: x64}
-          - {runner: macos-14, arch: arm64}
+          - {runner: macos-15, arch: arm64}
           - {runner: macos-15-intel, arch: x64}
     steps:
       - uses: actions/checkout@v4

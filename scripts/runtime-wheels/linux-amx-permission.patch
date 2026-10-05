@@ -1,0 +1,42 @@
+--- a/vendor/llama.cpp/ggml/src/ggml-cpu/arch/x86/cpu-feats.cpp
++++ b/vendor/llama.cpp/ggml/src/ggml-cpu/arch/x86/cpu-feats.cpp
+@@ -14,2 +14,7 @@
+ #include <string>
++
++#if defined(__linux__) && (defined(GGML_AMX_TILE) || defined(GGML_AMX_INT8) || defined(GGML_AMX_BF16))
++#include <sys/syscall.h>
++#include <unistd.h>
++#endif
+ 
+@@ -315,2 +320,8 @@
+ #endif
++#if defined(GGML_AMX_TILE) || defined(GGML_AMX_INT8) || defined(GGML_AMX_BF16)
++    if (!is.AMX_TILE()) { return 0; }
++#endif
++#ifdef GGML_AMX_BF16
++    if (!is.AMX_BF16()) { return 0; }
++#endif
+ #ifdef GGML_AMX_INT8
+@@ -342,2 +353,22 @@
+ #endif
++#if defined(GGML_AMX_TILE) || defined(GGML_AMX_INT8) || defined(GGML_AMX_BF16)
++    constexpr uint64_t tile_state = (uint64_t(1) << 17) | (uint64_t(1) << 18);
++    if ((xcr0 & tile_state) != tile_state) { return 0; }
++#if defined(__linux__)
++    constexpr int arch_get_xcomp_supp = 0x1021;
++    constexpr int arch_get_xcomp_perm = 0x1022;
++    constexpr int arch_req_xcomp_perm = 0x1023;
++    uint64_t supported = 0, permitted = 0;
++    // XCR0 alone does not grant AMX permission; the kernel may deny it, for
++    // example when an existing signal altstack cannot hold the larger state.
++    if (syscall(SYS_arch_prctl, arch_get_xcomp_supp, &supported) != 0 ||
++        (supported & tile_state) != tile_state ||
++        syscall(SYS_arch_prctl, arch_req_xcomp_perm, 18) != 0 ||
++        syscall(SYS_arch_prctl, arch_get_xcomp_perm, &permitted) != 0 ||
++        (permitted & tile_state) != tile_state) { return 0; }
++#else
++    // AMX dispatch requires the Linux permission API.
++    return 0;
++#endif
++#endif
+ #endif

@@ -17,6 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        runtime-version: ["0.3.20", "0.3.36"]
         platform:
           - {name: intel, runner: macos-15-intel, arch: x64, wheel-arch: x86_64, deployment-target: "11.0"}
           - {name: arm64, runner: macos-15, arch: arm64, wheel-arch: arm64, deployment-target: "11.0"}
@@ -39,14 +40,14 @@ jobs:
       - name: Build pinned upstream source
         run: >-
           python -m pip wheel --no-cache-dir --no-deps --no-build-isolation
-          -r scripts/runtime-wheels/sources/0.3.36.txt --wheel-dir wheelhouse
+          -r scripts/runtime-wheels/sources/${{ matrix.runtime-version }}.txt --wheel-dir wheelhouse
       - name: Verify installation and offline inference
         shell: python
         run: |
           import pathlib, re, subprocess, tempfile, venv, zipfile
           wheel, = pathlib.Path("wheelhouse").glob("*.whl")
           target = "${{ matrix.platform.deployment-target }}".replace(".", "_")
-          assert wheel.name == f"llama_cpp_python-0.3.36-py3-none-macosx_{target}_${{ matrix.platform.wheel-arch }}.whl"
+          assert wheel.name == f"llama_cpp_python-${{ matrix.runtime-version }}-py3-none-macosx_{target}_${{ matrix.platform.wheel-arch }}.whl"
           with tempfile.TemporaryDirectory() as root:
               native_root = pathlib.Path(root) / "native"
               with zipfile.ZipFile(wheel) as archive:
@@ -86,7 +87,7 @@ jobs:
                   subprocess.run([python, *args], check=True)
       - uses: actions/upload-artifact@v4
         with:
-          name: llama-cpp-macos-${{ matrix.platform.name }}-py${{ matrix.python-version }}
+          name: llama-cpp-macos-${{ matrix.runtime-version }}-${{ matrix.platform.name }}-py${{ matrix.python-version }}
           path: wheelhouse/*.whl
           if-no-files-found: error
 

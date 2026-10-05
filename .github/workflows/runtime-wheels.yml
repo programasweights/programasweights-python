@@ -99,6 +99,17 @@ jobs:
                   commands = subprocess.check_output(
                       ["otool", "-l", str(library)], text=True
                   )
+                  dependencies = re.findall(
+                      r"(?m)^\s*cmd LC_(?:LOAD|LOAD_WEAK|REEXPORT|LOAD_UPWARD|LAZY_LOAD)_DYLIB\n"
+                      r"\s*cmdsize \d+\n\s*name (.+) \(offset \d+\)$", commands,
+                  )
+                  assert dependencies, (library, "No library dependencies found")
+                  for dependency in dependencies:
+                      if dependency.startswith(("/usr/lib/", "/System/Library/")):
+                          continue
+                      assert dependency.startswith(("@rpath/", "@loader_path/")), (library, dependency)
+                      bundled = (library.parent / dependency.split("/", 1)[1]).resolve()
+                      assert native_root.resolve() in bundled.parents and bundled.is_file(), (library, dependency)
                   minima = re.findall(r"^\s*minos ([\d.]+)$", commands, re.MULTILINE)
                   assert minima in ([minimum_target], [minimum_target + ".0"]), (library, minima)
                   if target == "11_0":

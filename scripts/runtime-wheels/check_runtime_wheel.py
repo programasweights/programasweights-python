@@ -33,7 +33,7 @@ def main():
             ["-I", "-c",
              "import llama_cpp\n"
              "print(llama_cpp.llama_print_system_info().decode())\n"
-             "if llama_cpp.__version__ in ('0.3.27', '0.3.28', '0.3.29', '0.3.30', '0.3.31'):\n"
+             "if llama_cpp.__version__ in ('0.3.27', '0.3.28', '0.3.29', '0.3.30', '0.3.31', '0.3.32'):\n"
              "    import llama_cpp.llama_cpp_ext\n"
              "    print('NextN bindings: resolved', flush=True)"],
             prepare_command,

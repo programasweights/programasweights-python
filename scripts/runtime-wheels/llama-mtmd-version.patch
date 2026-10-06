@@ -1,0 +1,13 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -207,6 +207,10 @@
+             endif()
+         endif()
+ 
++        # Match llama when mtmd is added from this parent directory scope.
++        get_target_property(LLAMA_VERSION_BASE llama VERSION)
++        get_target_property(LLAMA_VERSION_MAJOR llama SOVERSION)
++
+         # Building llava
+         add_subdirectory(vendor/llama.cpp/tools/mtmd)
+ 

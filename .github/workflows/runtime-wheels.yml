@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime-version: ["0.3.20", "0.3.21", "0.3.22", "0.3.23", "0.3.24", "0.3.25", "0.3.26", "0.3.27", "0.3.28", "0.3.36"]
+        runtime-version: ["0.3.20", "0.3.21", "0.3.22", "0.3.23", "0.3.24", "0.3.25", "0.3.26", "0.3.27", "0.3.28", "0.3.29", "0.3.36"]
         platform:
           - {name: intel, runner: macos-15-intel, arch: x64, wheel-arch: x86_64, deployment-target: "11.0"}
           - {name: arm64, runner: macos-15, arch: arm64, wheel-arch: arm64, deployment-target: "11.0"}
@@ -68,7 +68,7 @@ jobs:
           printf '%s  %s\n' "${source_spec##*#sha256=}" "$build_dir/source.tar.gz" | shasum -a 256 --check
           tar -xzf "$build_dir/source.tar.gz" -C "$build_dir"
           cd "$build_dir/llama_cpp_python-$version"
-          if [[ "$version" == 0.3.21 || "$version" == 0.3.22 || "$version" == 0.3.23 || "$version" == 0.3.24 || "$version" == 0.3.25 || "$version" == 0.3.26 || "$version" == 0.3.27 || "$version" == 0.3.28 || "$version" == 0.3.36 ]]; then
+          if [[ "$version" == 0.3.21 || "$version" == 0.3.22 || "$version" == 0.3.23 || "$version" == 0.3.24 || "$version" == 0.3.25 || "$version" == 0.3.26 || "$version" == 0.3.27 || "$version" == 0.3.28 || "$version" == 0.3.29 || "$version" == 0.3.36 ]]; then
               patch -f -F 0 -V none -p1 < "$script_dir/macos-metal-event.patch"
           fi
           if [[ "$version" == 0.3.27 ]]; then
@@ -145,7 +145,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime-version: ["0.3.20", "0.3.21", "0.3.22", "0.3.23", "0.3.24", "0.3.25", "0.3.26", "0.3.27", "0.3.28", "0.3.36"]
+        runtime-version: ["0.3.20", "0.3.21", "0.3.22", "0.3.23", "0.3.24", "0.3.25", "0.3.26", "0.3.27", "0.3.28", "0.3.29", "0.3.36"]
     env:
       CMAKE_GENERATOR: Visual Studio 17 2022
       CMAKE_GENERATOR_PLATFORM: x64
@@ -242,7 +242,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime-version: ["0.3.20", "0.3.21", "0.3.22", "0.3.23", "0.3.24", "0.3.25", "0.3.26", "0.3.27", "0.3.28", "0.3.36"]
+        runtime-version: ["0.3.20", "0.3.21", "0.3.22", "0.3.23", "0.3.24", "0.3.25", "0.3.26", "0.3.27", "0.3.28", "0.3.29", "0.3.36"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

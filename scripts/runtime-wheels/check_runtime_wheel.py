@@ -30,7 +30,12 @@ def main():
         commands = [
             ["-m", "pip", "install", str(wheel), str(checkout)],
             ["-m", "pip", "check"],
-            ["-I", "-c", "import llama_cpp; print(llama_cpp.llama_print_system_info().decode())"],
+            ["-I", "-c",
+             "import llama_cpp\n"
+             "print(llama_cpp.llama_print_system_info().decode())\n"
+             "if llama_cpp.__version__ == '0.3.27':\n"
+             "    import llama_cpp.llama_cpp_ext\n"
+             "    print('NextN bindings: resolved', flush=True)"],
             prepare_command,
             ["-I", str(scripts / "check_native_inference.py"), fixtures],
         ]

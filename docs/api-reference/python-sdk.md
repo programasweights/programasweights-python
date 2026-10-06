@@ -42,9 +42,9 @@ bundle directly. Required runtime metadata and base models are cached for reuse.
 | `verbose` | Enable verbose logging (default `False`). |
 | `offline` | Use only local files/cache and make zero network calls; fail if required validated assets are missing. `PAW_OFFLINE=1` has the same effect. |
 | `remote` | Run hosted inference without downloading model assets (default `False`). Accepts a `Program` object, ID, or slug. Cannot be combined with offline mode, local file paths, `interpreter`, or non-default local runtime options. |
-| `interpreter` | Advanced adapter-free mode only. Must be passed by keyword and only when `program_id` is explicitly `None`. Supported values are `Qwen/Qwen3-0.6B` and `gpt2`. |
+| `interpreter` | Advanced adapter-free mode only. Must be passed by keyword and only when `program_id` is explicitly `None`. Supported values are `Qwen/Qwen3-0.6B`, `gpt2`, and `Qwen/Qwen3.5-0.8B`. |
 
-For local inference, the returned callable accepts:
+For local text-only programs, the returned callable accepts:
 
 ```python
 output: str = fn(input_text, max_tokens=None, temperature=0.0, logits_processor=None)
@@ -63,7 +63,9 @@ This advanced hook is not built-in regex or JSON-schema validation. Each process
 
 Compiled mode is strict: the adapter, prompt template, matching metadata,
 runtime manifest, and runtime-compatible base-model file must all validate. Version 0.4.5
-accepts runtime manifest version 1 with `adapter_format="gguf_lora"`.
+introduced runtime manifest version 1 with `adapter_format="gguf_lora"`.
+Image bundles use version 2 and additionally pin the projector, ordered-content
+prompt contract, and preprocessing settings.
 Built-in models are checked against pinned size/SHA-256 metadata and GGUF
 magic. Historical manifests for those known runtime IDs are normalized to the
 same canonical integrity metadata, so missing server-side checksum fields
@@ -144,10 +146,10 @@ This mode is intentionally explicit:
 - `program_id=""` raises `ValueError` and explains that base mode requires explicit `None`.
 - A non-empty program reference together with `interpreter` raises `ValueError`.
 - No PAW API, slug lookup, program download, adapter load, or disk prefix cache is used.
-- Online mode may download only the selected base GGUF from its built-in runtime manifest. Offline mode never downloads.
-- Every invocation resets model state, renders the complete prompt, and tokenizes that complete rendered prompt in one call.
+- Online mode may download the selected base GGUF and, for image interpreters, its projector from the built-in runtime manifest. Offline mode never downloads.
+- Every invocation resets model state. Text interpreters render and tokenize the complete text prompt; the image interpreter processes ordered text/image content.
 
-The built-in prompt contract is versioned with each runtime manifest and must contain exactly one `{INPUT_PLACEHOLDER}`:
+The built-in text prompt contracts are versioned with each runtime manifest and contain exactly one `{INPUT_PLACEHOLDER}`:
 
 ```text
 # Qwen/Qwen3-0.6B
@@ -168,6 +170,67 @@ The Qwen bytes are the exact raw-user rendering of
 Zero-token prompts and prompts that consume the full context window raise
 `ValueError`.
 
+### Local text/image calls
+
+Install `programasweights[vision]` to use Qwen3.5 image inference. The public
+call accepts ordered strings and `paw.Image` objects:
+
+```python
+with paw.function(None, interpreter="Qwen/Qwen3.5-0.8B") as compare:
+    answer = compare(
+        "Before:", paw.Image("before.png"),
+        "After:", paw.Image("after.png"),
+        "What changed?",
+        max_tokens=128,
+    )
+```
+
+The adapter-free function sends one user message containing these parts, with
+no injected system message. The pinned model chat template adds the assistant
+prefix with thinking disabled. It also accepts text-only calls. Each call is
+independent; no conversation, image, or recurrent-state cache carries across calls.
+
+A compatible image bundle loads through `paw.function("./locator.paw")` and
+uses the same call interface. Its `prompt_template.txt` provides literal system
+instructions; `{INPUT_PLACEHOLDER}` has no substitution meaning in that file.
+Bundle loading still requires a valid adapter and matching runtime metadata.
+
+```python
+output: str = fn(
+    *parts,
+    max_tokens=None,
+    temperature=0.0,
+    logits_processor=None,
+    response_format=None,
+)
+```
+
+Generation options are keyword-only for image functions. `response_format`
+passes a llama.cpp-compatible JSON response-format specification to the backend;
+always validate returned data, especially when `max_tokens` truncates the output.
+`max_tokens=0` returns an empty string without generation. Empty input lists and
+parts other than strings or `paw.Image` are rejected; unpack an existing list
+with `fn(*parts)`.
+
+`paw.Image(source)` accepts a regular local path, encoded image bytes, or a
+Pillow image and snapshots the supplied content. It does not fetch URLs. Images
+are decoded locally and converted to RGB PNG without SDK resizing, EXIF rotation,
+or ICC conversion. Transparency is composited over white. The backend uses the
+manifest's image-token limits to construct patches; high-bit-depth and floating
+point inputs require explicit conversion by the caller.
+
+Live functions share a model/projector only when the exact asset hashes,
+preprocessing, context size, GPU settings, and verbosity match. Shared calls
+serialize and switch adapters; closing one function leaves other users of that
+runtime usable. Close the last function to release native resources. Native
+runtimes must not be inherited through `fork`; use a spawned process instead.
+
+The built-in image interpreter pins a Q8_0 model and BF16 projector by repository
+revision, size, and SHA-256. Existing bundles retain their own exact asset
+identities; naming the same upstream model does not make different GGUF files
+interchangeable. Offline mode requires both verified files. Remote image
+inference and hosted image compilation are not introduced by this interface.
+
 ## Preparing programs for offline use
 
 ```python
@@ -178,7 +241,7 @@ ready = paw.is_offline_ready("da03/my-classifier")  # local check; no network
 cached = paw.list_cached_programs()
 ```
 
-`prepare_program` resolves and downloads the program, runtime manifest, and shared base model without retaining a loaded `PawFunction`. Pass `offline=True` to require an already complete local cache and prohibit network access.
+`prepare_program` resolves and downloads the program, runtime manifest, and shared base model (plus the projector for image programs) without retaining a loaded function. Pass `offline=True` to require an already complete local cache and prohibit network access.
 
 Desktop applications can receive structured progress without parsing stderr:
 

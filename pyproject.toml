@@ -42,6 +42,10 @@ Documentation = "https://programasweights.readthedocs.io"
 
 [project.optional-dependencies]
 test = ["pytest"]
+vision = [
+  "Pillow>=9.1.1",
+  "llama-cpp-python>=0.3.35",
+]
 
 [project.scripts]
 paw = "programasweights.cli:main"

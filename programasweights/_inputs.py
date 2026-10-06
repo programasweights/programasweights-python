@@ -1,0 +1,99 @@
+"""Typed input snapshots, independent of model loading and preprocessing."""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from dataclasses import dataclass
+import os
+import stat
+from typing import TYPE_CHECKING, Tuple, Union
+
+if TYPE_CHECKING:
+    from PIL.Image import Image as _PILImage
+
+
+def _read_file(path: Union[str, os.PathLike]) -> bytes:
+    # Nonblocking open lets us reject FIFOs without waiting for a writer.
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NONBLOCK", 0)
+    descriptor = os.open(path, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError("Image source must be a regular local file.")
+        with os.fdopen(descriptor, "rb", closefd=False) as source:
+            return source.read()
+    finally:
+        os.close(descriptor)
+
+
+def _copy_pixels(source):
+    snapshot = source.copy()
+    # Pillow's copy() copies pixels and palette, but only shallow-copies info.
+    snapshot.info = deepcopy(source.info)
+    return snapshot
+
+
+@dataclass(frozen=True, init=False, repr=False, eq=False)
+class Image:
+    """Snapshot an image supplied as a local path, encoded bytes, or PIL image.
+
+    Paths are read immediately and encoded bytes are retained unchanged. Pillow
+    images are copied in their current mode and at their current frame, including
+    palette and metadata. Later changes to the caller's file or image do not
+    affect this value. URLs, file handles, and mutable byte buffers are not input
+    types; a plain string outside Image remains text.
+
+    Encoded data is not decoded or validated here. No resizing, color conversion,
+    or model preprocessing is performed. Copying a lazily opened Pillow image
+    may decode its current frame. Paths and encoded bytes do not require Pillow.
+
+    This input type does not itself enable image inference in text functions.
+    """
+
+    _source: Union[bytes, _PILImage]
+
+    def __init__(self, source: Union[str, os.PathLike, bytes, _PILImage]):
+        if isinstance(source, bytes):
+            snapshot = bytes(source)
+        elif isinstance(source, (str, os.PathLike)):
+            path = os.fspath(source)
+            if not isinstance(path, str):
+                raise TypeError("Image paths must resolve to str; bytes are encoded image data.")
+            snapshot = _read_file(path)
+        else:
+            # A PIL object normally means Pillow is already imported. Keep it
+            # optional for text users and for callers supplying paths or bytes.
+            try:
+                from PIL.Image import Image as PILImage
+            except ModuleNotFoundError as error:
+                if error.name not in ("PIL", "PIL.Image"):
+                    raise
+                PILImage = None
+            if PILImage is None or not isinstance(source, PILImage):
+                raise TypeError(
+                    "Image source must be a local path, encoded bytes, or a PIL.Image.Image."
+                )
+            snapshot = _copy_pixels(source)
+        object.__setattr__(self, "_source", snapshot)
+
+    def _copy_source(self):
+        """Give preprocessing its own copy without exposing mutable pixels."""
+        if isinstance(self._source, bytes):
+            return self._source
+        return _copy_pixels(self._source)
+
+    def __repr__(self) -> str:
+        kind = "encoded bytes" if isinstance(self._source, bytes) else "PIL image"
+        return f"Image(<{kind} snapshot>)"
+
+
+def _normalize_parts(*parts: Union[str, Image]) -> Tuple[Union[str, Image], ...]:
+    """Validate positional content without merging text or interpreting paths."""
+    if not parts:
+        raise ValueError("At least one input part is required.")
+    for index, part in enumerate(parts, start=1):
+        if not isinstance(part, (str, Image)):
+            raise TypeError(
+                f"Input part {index} must be str or paw.Image, got {type(part).__name__}. "
+                "Wrap image sources in paw.Image(...); unpack a list with *parts."
+            )
+    return parts

@@ -74,12 +74,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install (hermetic deps only)
-        # Install httpx + pytest and the package itself without pulling the heavy
+        # Install test dependencies without pulling the heavy
         # llama-cpp-python build. Runtime tests inject a fake llama_cpp module,
         # so CI needs neither the native extension nor a model download.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install httpx pytest
+          python -m pip install httpx pytest Pillow
           python -m pip install -e . --no-deps
 
       - name: Run hermetic tests
@@ -96,7 +96,12 @@ jobs:
             tests/test_cli_auth.py \
             tests/test_remote_inference.py \
             tests/test_desktop_sdk.py \
+            tests/test_inputs.py \
+            tests/test_image_content.py \
             tests/test_runtime_registry_sdk.py \
+            tests/test_vision_metadata.py \
+            tests/test_vision_assets.py \
+            tests/test_vision_runtime.py \
             tests/test_sdk.py::TestInstallAndImport
 
   local-files-windows:

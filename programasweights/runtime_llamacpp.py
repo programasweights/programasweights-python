@@ -117,6 +117,7 @@ class PawFunction:
                 self._meta = json.load(handle)
             if not isinstance(self._meta, dict):
                 raise ValueError(f"Invalid program metadata: {meta_path}")
+            cache.require_text_execution(self._meta)
             interpreter = self._meta.get("interpreter")
             if not isinstance(interpreter, str) or not interpreter:
                 raise ValueError(

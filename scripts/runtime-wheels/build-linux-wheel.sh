@@ -3,7 +3,7 @@ set -euo pipefail
 
 version=${2:-0.3.36}
 case "$version" in
-    0.3.20|0.3.21|0.3.22|0.3.23|0.3.24|0.3.25|0.3.26|0.3.27|0.3.36)
+    0.3.20|0.3.21|0.3.22|0.3.23|0.3.24|0.3.25|0.3.26|0.3.27|0.3.28|0.3.36)
         patches=(linux-backend-install-dir linux-backend-packaging
                  linux-backend-search-path linux-cpu-os-state
                  linux-amx-permission linux-amx-gcc11)

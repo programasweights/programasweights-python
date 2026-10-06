@@ -1,0 +1,1 @@
+https://files.pythonhosted.org/packages/c1/2f/46487e949da42b31847853793ddbfd44c7414e94d4364c9a41f91f30af27/llama_cpp_python-0.3.34.tar.gz#sha256=d849d286d808284f1d3ec1bd6875572430d29d1f9574a010232caa4e9cef0e35

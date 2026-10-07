@@ -125,7 +125,7 @@ Install the optional image dependencies:
 pip install "programasweights[vision]" --extra-index-url https://pypi.programasweights.com/simple/
 ```
 
-Run Qwen3.5-0.8B locally with text and images:
+Prompt Qwen3.5-0.8B locally with text and images (no adapter applied):
 
 ```python
 import programasweights as paw

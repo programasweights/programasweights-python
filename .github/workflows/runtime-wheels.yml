@@ -3,6 +3,7 @@ name: Runtime wheels
 on:
   workflow_dispatch:
   push:
+    branches: ['**']
     paths:
       - .github/workflows/runtime-wheels.yml
       - scripts/runtime-wheels/**

@@ -175,7 +175,6 @@ answer = fn("Find the red cup.", paw.Image("scene.png"))
 
 `paw.Image(source)` accepts a local file path, encoded image bytes, or a Pillow
 image. For an image URL, download the file first. Plain strings are text inputs.
-To pass a list of text and images, unpack it with `fn(*parts)`.
 
 Image functions return a string. Generation options are passed by keyword:
 

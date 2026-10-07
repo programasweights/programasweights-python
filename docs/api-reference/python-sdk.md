@@ -202,6 +202,7 @@ output: str = fn(
     temperature=0.0,
     logits_processor=None,
     response_format=None,
+    return_info=False,
 )
 ```
 
@@ -211,6 +212,32 @@ always validate returned data, especially when `max_tokens` truncates the output
 `max_tokens=0` returns an empty string without generation. Empty input lists and
 parts other than strings or `paw.Image` are rejected; unpack an existing list
 with `fn(*parts)`.
+
+Pass `return_info=True` to receive a `paw.FunctionResult` instead of a string:
+
+```python
+result = fn("Find the target:", paw.Image("scene.png"), return_info=True)
+print(result.text)
+print(result.finish_reason)    # Backend reason, e.g. "stop" or "length"; otherwise None.
+print(result.usage)            # Backend token counts, or None when unavailable.
+print(result.elapsed_seconds) # Full call duration through native cleanup.
+```
+
+The result is immutable and belongs to that call. `usage`, when present, is a
+copied, read-only mapping; use `dict(result.usage)` when logging it as JSON.
+Counts have the backend's semantics; they are not an estimate of image patches
+or billable tokens. `elapsed_seconds` uses a monotonic clock and includes input
+preparation, waiting for function/runtime locks, adapter selection, inference,
+and native cleanup. It excludes loading the function and constructing input
+`paw.Image` objects before the call.
+
+`return_info` is a keyword-only boolean and defaults to `False`, preserving
+string returns. With `max_tokens=0`, the opt-in result has empty text and `None`
+for both backend fields, because no generation ran. Truncated text is still
+returned with the backend's `"length"` reason; errors still raise normally.
+This option applies to the local Qwen3.5 image runtime, including text-only calls
+to that interpreter and compiled image programs. Existing text runtimes and
+remote inference do not accept this option.
 
 `paw.Image(source)` accepts a regular local path, encoded image bytes, or a
 Pillow image and snapshots the supplied content. It does not fetch URLs. Images

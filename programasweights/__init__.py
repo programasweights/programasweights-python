@@ -34,6 +34,7 @@ except Exception:
     __version__ = "0.4.11"
 
 from ._inputs import Image
+from ._result import FunctionResult
 from ._output import ProgressCallback, ProgressEvent, report_progress
 from .cache import CachedProgram
 from .client import (
@@ -730,6 +731,7 @@ __all__ = [
     "CompileJob",
     "CompilePrecheck",
     "CompileStatus",
+    "FunctionResult",
     "Program",
     "ProgressCallback",
     "ProgressEvent",

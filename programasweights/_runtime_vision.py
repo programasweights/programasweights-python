@@ -17,9 +17,12 @@ import os
 from pathlib import Path
 import re
 import threading
+from time import perf_counter
+from typing import Literal, Union, overload
 
 from . import cache
 from ._image_content import _to_chat_content
+from ._result import FunctionResult
 from ._vision_assets import get_vision_asset_paths
 from ._vision_contract import VISION_BASE_INFERENCE, declares_vision
 
@@ -159,7 +162,7 @@ class _Runtime:
             raise RuntimeError("Failed to select the vision LoRA adapter.")
 
     def run(self, adapter, messages, *, max_tokens, temperature,
-            logits_processor=None, response_format=None):
+            logits_processor=None, response_format=None, return_info=False):
         with self.lock:
             if self.closed:
                 raise RuntimeError("This vision runtime has been closed.")
@@ -199,6 +202,12 @@ class _Runtime:
                 content = response["choices"][0]["message"]["content"]
                 if not isinstance(content, str):
                     raise RuntimeError("The vision function returned no text content.")
+                if return_info:
+                    usage = response.get("usage")
+                    return (
+                        content.strip(), response["choices"][0].get("finish_reason"),
+                        None if usage is None else dict(usage),
+                    )
                 return content.strip()
             except BaseException as exc:
                 error = exc
@@ -241,6 +250,7 @@ class VisionFunction:
 
     Generation options are keyword-only. Calls return text (including partial
     text when max_tokens is exhausted); callers validate structured outputs.
+    Opt into a per-call FunctionResult with return_info=True.
     Close functions, or use a context manager, to release shared model memory.
     """
 
@@ -303,8 +313,27 @@ class VisionFunction:
             runtime.references += 1
             self._runtime = runtime
 
+    @overload
     def __call__(self, *parts, max_tokens=None, temperature=0.0,
-                 logits_processor=None, response_format=None) -> str:
+                 logits_processor=None, response_format=None,
+                 return_info: Literal[False] = False) -> str: ...
+
+    @overload
+    def __call__(self, *parts, max_tokens=None, temperature=0.0,
+                 logits_processor=None, response_format=None,
+                 return_info: Literal[True]) -> FunctionResult: ...
+
+    @overload
+    def __call__(self, *parts, max_tokens=None, temperature=0.0,
+                 logits_processor=None, response_format=None,
+                 return_info: bool) -> Union[str, FunctionResult]: ...
+
+    def __call__(self, *parts, max_tokens=None, temperature=0.0,
+                 logits_processor=None, response_format=None,
+                 return_info: bool = False) -> Union[str, FunctionResult]:
+        if type(return_info) is not bool:
+            raise TypeError("return_info must be a bool.")
+        started = perf_counter() if return_info else None
         _outside_call()
         if os.getpid() != self._pid:
             raise RuntimeError("Load a new vision function in each child process.")
@@ -317,15 +346,22 @@ class VisionFunction:
                 raise ValueError("temperature must be a finite non-negative number.")
             content = _to_chat_content(*parts)
             if max_tokens == 0:
+                if return_info:
+                    return FunctionResult("", None, None, perf_counter() - started)
                 return ""
             messages = []
             if self._prompt is not None:
                 messages.append({"role": "system", "content": self._prompt})
             messages.append({"role": "user", "content": content})
-            return self._runtime.run(
+            output = self._runtime.run(
                 self._adapter, messages, max_tokens=max_tokens, temperature=temperature,
                 logits_processor=logits_processor, response_format=response_format,
+                return_info=return_info,
             )
+            if return_info:
+                text, finish_reason, usage = output
+                return FunctionResult(text, finish_reason, usage, perf_counter() - started)
+            return output
 
     def close(self):
         if os.getpid() != self._pid:

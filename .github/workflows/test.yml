@@ -102,6 +102,7 @@ jobs:
             tests/test_vision_metadata.py \
             tests/test_vision_assets.py \
             tests/test_vision_runtime.py \
+            tests/test_vision_result.py \
             tests/test_sdk.py::TestInstallAndImport
 
   local-files-windows:

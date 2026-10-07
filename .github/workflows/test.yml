@@ -181,3 +181,8 @@ jobs:
           run("-I", "-c", "import programasweights, llama_cpp; "
               "print(programasweights.__version__, llama_cpp.__version__); "
               "print(llama_cpp.llama_print_system_info().decode())")
+          run("-m", "pip", "install", str(wheel) + "[vision]", "--extra-index-url",
+              "https://pypi.programasweights.com/simple/", "--only-binary=llama-cpp-python")
+          run("-m", "pip", "check")
+          run("-I", "-c", "import PIL, llama_cpp.mtmd_cpp; "
+              "from llama_cpp.llama_chat_format import MTMDChatHandler")

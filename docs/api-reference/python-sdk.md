@@ -193,14 +193,14 @@ output: str = fn(
 text functions. Use `response_format={"type": "json_object"}` to request JSON
 output.
 
-#### Result metadata
-
-Pass `return_info=True` to get a `paw.FunctionResult` with the output and timing:
+Pass `return_info=True` to receive a `paw.FunctionResult` instead of a string:
 
 ```python
-result = fn("Find the red cup.", paw.Image("scene.png"), return_info=True)
+result = fn("Find the target:", paw.Image("scene.png"), return_info=True)
 print(result.text)
-print(result.elapsed_seconds)
+print(result.finish_reason)    # e.g. "stop" or "length"; None when unavailable.
+print(result.usage)            # Token counts, or None when unavailable.
+print(result.elapsed_seconds)  # Total call time in seconds.
 ```
 
 | Attribute | Description |

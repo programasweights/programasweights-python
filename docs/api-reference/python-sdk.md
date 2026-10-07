@@ -209,7 +209,8 @@ measures the full call, excluding model loading and construction of
 `paw.Image` inputs.
 
 `return_info` is available for local Qwen3.5 functions, including text-only calls
-and compiled image programs.
+and compiled image programs. A `finish_reason` of `"length"` means generation
+reached a token limit.
 
 #### Offline use and closing functions
 

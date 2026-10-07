@@ -116,6 +116,35 @@ Advanced adapter-free inference is available with
 `paw.function(None, interpreter="gpt2")`; see the Python API reference for
 its intentionally strict semantics.
 
+## Local image functions
+
+Install the optional image dependencies:
+
+```bash
+pip install "programasweights[vision]" --extra-index-url https://pypi.programasweights.com/simple/
+```
+
+Prompt Qwen3.5-0.8B without an adapter:
+
+```python
+import programasweights as paw
+
+with paw.function(None, interpreter="Qwen/Qwen3.5-0.8B") as describe:
+    print(describe("Describe this image.", paw.Image("photo.png"), max_tokens=128))
+```
+
+Or load a compatible image `.paw` bundle with `paw.function("./locator.paw")`.
+Image functions accept ordered positional strings and `paw.Image` objects;
+generation options are keyword-only. `paw.Image` snapshots a local path,
+encoded bytes, or a Pillow image. The SDK keeps native image dimensions and
+composites transparency over white; the model backend constructs image patches.
+
+The first load downloads the exact model and projector. Use `offline=True`
+after caching both files. Matching model/projector hashes and runtime settings
+share one local runtime; calls reset model state and select the correct LoRA.
+Use context managers or `close()` to release it. Image inference is local only;
+this SDK change does not add a hosted image compiler or remote image inference.
+
 ## Browser SDK
 
 Programs compiled with GPT-2 also run in the browser via WebAssembly. The initial model and program assets download automatically; inference then runs client-side.

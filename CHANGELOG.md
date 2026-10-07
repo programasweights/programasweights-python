@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.12 (2026-10-07)
+
+- Add local Qwen3.5-0.8B functions with ordered text and `paw.Image` inputs,
+  including compatible image `.paw` bundles.
+- Add image dependencies through `programasweights[vision]`.
+- Add `return_info=True` for immutable results with finish reason, token counts,
+  and elapsed call time. Results can be returned from multiprocessing workers.
+
 ## 0.4.11 (2026-10-04)
 
 - Support llama-cpp-python 0.3.36.

@@ -31,8 +31,10 @@ try:
     from importlib.metadata import version as _meta_version
     __version__ = _meta_version("programasweights")
 except Exception:
-    __version__ = "0.4.11"
+    __version__ = "0.4.12"
 
+from ._inputs import Image
+from ._result import FunctionResult
 from ._output import ProgressCallback, ProgressEvent, report_progress
 from .cache import CachedProgram
 from .client import (
@@ -332,7 +334,11 @@ def prepare_program(
         },
     )
 
-    if offline:
+    if cache.declares_vision(meta):
+        from ._vision_assets import get_vision_asset_paths
+
+        get_vision_asset_paths(runtime_manifest, offline=offline, progress=progress)
+    elif offline:
         base_model_path = cache.get_cached_base_model_path(runtime_manifest)
         if base_model_path is None:
             raise RuntimeError(
@@ -445,11 +451,15 @@ def function(
             program IDs, slugs, pinned versions, and Program objects. Cannot
             be combined with offline mode or non-default local runtime options.
         interpreter: Advanced adapter-free mode. This is only valid when
-            ``program_id`` is explicitly ``None``. Initially supported values
-            are ``"Qwen/Qwen3-0.6B"`` and ``"gpt2"``.
+            ``program_id`` is explicitly ``None``. Supported values are
+            ``"Qwen/Qwen3-0.6B"``, ``"gpt2"``, and ``"Qwen/Qwen3.5-0.8B"``.
+            Qwen3.5 accepts ordered text/image parts as one user message,
+            without a system prompt or an adapter.
 
     Returns:
-        A callable that takes an input string and returns an output string.
+        A callable returning an output string. Text programs accept one input
+        string. Image programs accept ordered positional strings and paw.Image
+        objects, with generation options passed by keyword.
 
     Example:
         >>> fn = paw.function("email-triage")
@@ -463,6 +473,9 @@ def function(
         >>> fn = paw.function("./classifier.paw")  # local bundle
 
         >>> base = paw.function(None, interpreter="gpt2")
+
+        >>> vision = paw.function(None, interpreter="Qwen/Qwen3.5-0.8B")
+        >>> vision("Describe this image.", paw.Image("photo.png"))
     """
     import os
     from . import cache
@@ -492,10 +505,16 @@ def function(
             raise ValueError(
                 "program_id=None requires an explicit interpreter."
             )
-        cache.get_base_runtime_manifest(interpreter)
-        from .runtime_llamacpp import PawFunction
+        runtime_manifest = cache.get_base_runtime_manifest(interpreter)
+        if cache.declares_vision({"runtime": runtime_manifest}):
+            from ._runtime_vision import VisionFunction
 
-        return PawFunction.from_base(
+            function_type = VisionFunction
+        else:
+            from .runtime_llamacpp import PawFunction
+
+            function_type = PawFunction
+        return function_type.from_base(
             interpreter,
             n_ctx=n_ctx,
             n_gpu_layers=n_gpu_layers,
@@ -549,7 +568,15 @@ def function(
             )
         program_dir = cache.get_program_dir(resolved_id)
 
-    return PawFunction(
+    import json
+
+    function_type = PawFunction
+    meta = json.loads((program_dir / "meta.json").read_text(encoding="utf-8"))
+    if cache.declares_vision(meta):
+        from ._runtime_vision import VisionFunction
+
+        function_type = VisionFunction
+    return function_type(
         program_dir,
         n_ctx=n_ctx,
         n_gpu_layers=n_gpu_layers,
@@ -704,6 +731,7 @@ __all__ = [
     "CompileJob",
     "CompilePrecheck",
     "CompileStatus",
+    "FunctionResult",
     "Program",
     "ProgressCallback",
     "ProgressEvent",

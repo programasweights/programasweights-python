@@ -31,6 +31,13 @@ import httpx
 
 from . import config
 from ._output import ProgressCallback, report_progress
+from ._vision_contract import (
+    BUILTIN_VISION_RUNTIMES,
+    VISION_MANIFEST_VERSION,
+    declares_vision,
+    require_text_execution,
+    valid_vision_contract,
+)
 
 BASE_MODEL_URLS = {
     "qwen3-0.6b-q6_k": "https://huggingface.co/programasweights/Qwen3-0.6B-GGUF-Q6_K/resolve/main/qwen3-0.6b-q6_k.gguf",
@@ -39,6 +46,7 @@ BASE_MODEL_URLS = {
 
 INTERPRETER_TO_GGUF = {
     "Qwen/Qwen3-0.6B": "qwen3-0.6b-q6_k",
+    "Qwen/Qwen3.5-0.8B": "qwen3.5-0.8b-q8_0",
     "gpt2": "gpt2-q8_0",
 }
 
@@ -57,7 +65,7 @@ GPT2_BASE_PROMPT_TEMPLATE = "{INPUT_PLACEHOLDER}"
 _PROGRAM_ID_RE = re.compile(r"^[a-f0-9]{16,64}$")
 _RUNTIME_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _SHA256_RE = re.compile(r"^[a-fA-F0-9]{64}$")
-SUPPORTED_RUNTIME_MANIFEST_VERSIONS = frozenset({1})
+SUPPORTED_RUNTIME_MANIFEST_VERSIONS = frozenset({1, VISION_MANIFEST_VERSION})
 GGUF_MAGIC = b"GGUF"
 MIN_ADAPTER_GGUF_SIZE = 1024
 # A waiter may be behind a slow first download of the 622 MB Qwen GGUF.
@@ -345,6 +353,11 @@ def _runtime_manifest_has_valid_shape(
     ):
         return False
 
+    if manifest_version == VISION_MANIFEST_VERSION:
+        return valid_vision_contract(runtime_manifest)
+    if declares_vision({"runtime": runtime_manifest}):
+        return False
+
     prompt_template = runtime_manifest.get("prompt_template")
     if prompt_template is not None and (
         not isinstance(prompt_template, dict)
@@ -457,6 +470,17 @@ def _normalize_runtime_manifest(
 
     normalized = json.loads(json.dumps(runtime_manifest))
     runtime_id = normalized["runtime_id"]
+    canonical_vision = BUILTIN_VISION_RUNTIMES.get(runtime_id)
+    if canonical_vision is not None:
+        # V2 already requires complete asset identities. A named built-in
+        # cannot silently substitute a projector, prompt, or preprocessing.
+        for field in (
+            "manifest_version", "interpreter", "adapter_format", "input",
+            "prompt_template", "program_assets", "local_sdk", "js_sdk",
+        ):
+            if normalized.get(field) != canonical_vision[field]:
+                return None
+        return normalized
     canonical = LEGACY_RUNTIME_MANIFESTS.get(runtime_id)
     if canonical is None:
         return normalized
@@ -688,7 +712,7 @@ def get_base_runtime_manifest(interpreter: str) -> dict:
             f"Unknown interpreter: {interpreter!r}. "
             f"Supported: {list(INTERPRETER_TO_GGUF.keys())}"
         )
-    manifest = LEGACY_RUNTIME_MANIFESTS.get(runtime_id)
+    manifest = BUILTIN_VISION_RUNTIMES.get(runtime_id) or LEGACY_RUNTIME_MANIFESTS.get(runtime_id)
     if (
         not _is_runtime_manifest_complete(manifest)
         or manifest.get("interpreter") != interpreter
@@ -707,6 +731,7 @@ def get_base_prompt_template(runtime_manifest: dict) -> str:
     )
     if normalized is None:
         raise ValueError("Invalid runtime manifest shape.")
+    require_text_execution({"runtime": normalized})
     contract = normalized.get("base_inference")
     if not isinstance(contract, dict):
         raise ValueError(
@@ -742,6 +767,13 @@ def _normalize_runtime_manifest_for_program(
     )
     if normalized is None:
         return None
+    if normalized["manifest_version"] == VISION_MANIFEST_VERSION and (
+        program_meta.get("runtime_id") != normalized["runtime_id"]
+        or program_meta.get("interpreter") != normalized["interpreter"]
+        or type(program_meta.get("runtime_manifest_version")) is not int
+        or program_meta["runtime_manifest_version"] != VISION_MANIFEST_VERSION
+    ):
+        return None
     runtime_id = program_meta.get("runtime_id")
     if runtime_id and normalized.get("runtime_id") != runtime_id:
         return None
@@ -773,6 +805,10 @@ def _runtime_manifest_matches_program(
 def get_offline_runtime_manifest(program_meta: dict) -> dict | None:
     """Resolve the exact runtime manifest without performing network I/O."""
     embedded = program_meta.get("runtime")
+    if declares_vision(program_meta):
+        # V2 is self-contained: never replace missing/invalid image settings
+        # with a cached, fetched, or legacy text contract.
+        return _normalize_runtime_manifest_for_program(embedded, program_meta)
     if isinstance(embedded, dict):
         normalized_embedded = _normalize_runtime_manifest_for_program(
             embedded,
@@ -851,6 +887,8 @@ def resolve_runtime_manifest(
     offline: bool = False,
 ) -> dict | None:
     embedded = program_meta.get("runtime")
+    if declares_vision(program_meta):
+        return _normalize_runtime_manifest_for_program(embedded, program_meta)
     if isinstance(embedded, dict):
         normalized_embedded = _normalize_runtime_manifest_for_program(
             embedded,
@@ -924,6 +962,11 @@ def get_cached_base_model_path(runtime_manifest: dict) -> Path | None:
     local_sdk = normalized.get("local_sdk")
     if not isinstance(local_sdk, dict) or not local_sdk.get("supported", False):
         return None
+    if normalized["manifest_version"] == VISION_MANIFEST_VERSION:
+        from ._vision_assets import get_cached_vision_asset_paths
+
+        paths = get_cached_vision_asset_paths(normalized)
+        return paths.base_model if paths is not None else None
     base_model = _base_model_info_from_runtime(normalized)
     file_name = base_model.get("file") if base_model else None
     if (
@@ -979,6 +1022,11 @@ def get_base_model_path(
             f"Runtime {manifest.get('runtime_id')!r} is for interpreter "
             f"{manifest_interpreter!r}, not {interpreter!r}."
         )
+
+    if manifest["manifest_version"] == VISION_MANIFEST_VERSION:
+        from ._vision_assets import get_vision_asset_paths
+
+        return get_vision_asset_paths(manifest, offline=offline, progress=progress).base_model
 
     local_sdk = manifest["local_sdk"]
     base_model = local_sdk["base_model"]
@@ -1162,9 +1210,15 @@ def validate_program_assets_dir(
     except (UnicodeDecodeError, json.JSONDecodeError, OSError):
         return False
 
-    if template.count(INPUT_PLACEHOLDER) != 1:
-        return False
     if not isinstance(meta, dict) or meta.get("program_id") != expected_program_id:
+        return False
+    if declares_vision(meta):
+        # The same archive member now holds literal system instructions.
+        # It must never be interpreted as a rendered-text placeholder template.
+        return _normalize_runtime_manifest_for_program(
+            meta.get("runtime"), meta,
+        ) is not None
+    if template.count(INPUT_PLACEHOLDER) != 1:
         return False
     interpreter = meta.get("interpreter")
     if not isinstance(interpreter, str) or not interpreter:

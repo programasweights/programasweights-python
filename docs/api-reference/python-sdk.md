@@ -152,8 +152,9 @@ the input as a raw prompt.
 
 ### Local text/image calls
 
-Install `programasweights[vision]` to run Qwen3.5-0.8B locally. Pass text and
-`paw.Image` objects as separate arguments, in the order the model should read them:
+Install `programasweights[vision]` to prompt Qwen3.5-0.8B locally
+(no adapter applied). Pass text and `paw.Image` objects in the order
+the model should read them:
 
 ```python
 compare = paw.function(None, interpreter="Qwen/Qwen3.5-0.8B")

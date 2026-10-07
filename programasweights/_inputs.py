@@ -34,19 +34,10 @@ def _copy_pixels(source):
 
 @dataclass(frozen=True, init=False, repr=False, eq=False)
 class Image:
-    """Snapshot an image supplied as a local path, encoded bytes, or PIL image.
+    """An image to pass to a local image function.
 
-    Paths are read immediately and encoded bytes are retained unchanged. Pillow
-    images are copied in their current mode and at their current frame, including
-    palette and metadata. Later changes to the caller's file or image do not
-    affect this value. URLs, file handles, and mutable byte buffers are not input
-    types; a plain string outside Image remains text.
-
-    Encoded data is not decoded or validated here. No resizing, color conversion,
-    or model preprocessing is performed. Copying a lazily opened Pillow image
-    may decode its current frame. Paths and encoded bytes do not require Pillow.
-
-    This input type does not itself enable image inference in text functions.
+    Accepts a file path, encoded image bytes, or a Pillow image. For example:
+    ``fn("Describe this image.", paw.Image("photo.png"))``.
     """
 
     _source: Union[bytes, _PILImage]

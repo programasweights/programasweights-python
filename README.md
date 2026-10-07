@@ -112,10 +112,10 @@ may still download; `offline=True` prohibits those requests. Legacy tensor-forma
 `.paw` files are unsupported. Local-file inputs are supported by `function`,
 not `prepare_program` or `is_offline_ready`.
 
-Advanced adapter-free inference is available with
-`paw.function(None, interpreter="gpt2")`; see the
+To run a base model without a compiled program, use
+`paw.function(None, interpreter="gpt2")`. See the
 [Python API reference](docs/api-reference/python-sdk.md#advanced-adapter-free-base-interpreter)
-for its intentionally strict semantics.
+for supported models and options.
 
 ## Local image functions
 
@@ -125,26 +125,20 @@ Install the optional image dependencies:
 pip install "programasweights[vision]" --extra-index-url https://pypi.programasweights.com/simple/
 ```
 
-Prompt Qwen3.5-0.8B without an adapter:
+Prompt Qwen3.5-0.8B locally with text and images (no adapter applied):
 
 ```python
 import programasweights as paw
 
-with paw.function(None, interpreter="Qwen/Qwen3.5-0.8B") as describe:
-    print(describe("Describe this image.", paw.Image("photo.png"), max_tokens=128))
+describe = paw.function(None, interpreter="Qwen/Qwen3.5-0.8B")
+print(describe("Describe this image.", paw.Image("photo.png")))
 ```
 
-Or load a compatible image `.paw` bundle with `paw.function("./locator.paw")`.
-Image functions accept ordered positional strings and `paw.Image` objects;
-generation options are keyword-only. `paw.Image` snapshots a local path,
-encoded bytes, or a Pillow image. The SDK keeps native image dimensions and
-composites transparency over white; the model backend constructs image patches.
+To use a compiled image program, load its `.paw` file with
+`paw.function("./locator.paw")`.
 
-The first load downloads the exact model and projector. Use `offline=True`
-after caching both files. Matching model/projector hashes and runtime settings
-share one local runtime; calls reset model state and select the correct LoRA.
-Use context managers or `close()` to release it. Image inference is local only;
-this SDK change does not add a hosted image compiler or remote image inference.
+See the [image API reference](docs/api-reference/python-sdk.md#local-textimage-calls)
+for multiple images, input formats, and result metadata.
 
 ## Browser SDK
 

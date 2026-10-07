@@ -246,12 +246,11 @@ class _Runtime:
 
 
 class VisionFunction:
-    """A compiled image program or base interpreter, with ordered parts.
+    """A local function accepting text and Image arguments.
 
-    Generation options are keyword-only. Calls return text (including partial
-    text when max_tokens is exhausted); callers validate structured outputs.
-    Opt into a per-call FunctionResult with return_info=True.
-    Close functions, or use a context manager, to release shared model memory.
+    Calls return a string, or a FunctionResult with ``return_info=True``.
+    Pass generation options by keyword. Use ``close()`` or a ``with`` block
+    to close the function when finished.
     """
 
     def __init__(self, program_dir, n_ctx=2048, n_gpu_layers=-1, verbose=False,

@@ -7,11 +7,10 @@ from typing import Mapping, Optional
 
 @dataclass(frozen=True)
 class FunctionResult:
-    """Text and optional backend metadata from one successful image-runtime call.
+    """Text, token counts, and timing returned with ``return_info=True``.
 
-    ``usage`` is a copied, read-only mapping of backend token counts, or None
-    when unavailable. ``elapsed_seconds`` covers the call through native cleanup,
-    including input preparation and lock waits, but not function loading.
+    ``usage`` is a read-only mapping of token counts, or None when unavailable.
+    ``elapsed_seconds`` is the total call duration, excluding model loading.
     """
 
     text: str

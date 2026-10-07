@@ -453,8 +453,8 @@ def function(
         interpreter: Advanced adapter-free mode. This is only valid when
             ``program_id`` is explicitly ``None``. Supported values are
             ``"Qwen/Qwen3-0.6B"``, ``"gpt2"``, and ``"Qwen/Qwen3.5-0.8B"``.
-            Qwen3.5 accepts ordered text/image parts as one user message,
-            without a system prompt or an adapter.
+            Qwen3.5 processes text and ``paw.Image`` arguments in the order
+            provided.
 
     Returns:
         A callable returning an output string. Text programs accept one input

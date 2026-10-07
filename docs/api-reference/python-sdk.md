@@ -61,17 +61,6 @@ This advanced hook is not built-in regex or JSON-schema validation. Each process
 
 **Context limits:** Spec + input + output share a ~2048 token window. Inputs that exceed it will error. `max_tokens` defaults to `None`: generation runs until EOS or the context limit.
 
-Compiled mode is strict: the adapter, prompt template, matching metadata,
-runtime manifest, and runtime-compatible base-model file must all validate. Version 0.4.5
-introduced runtime manifest version 1 with `adapter_format="gguf_lora"`.
-Image bundles use version 2 and additionally pin the projector, ordered-content
-prompt contract, and preprocessing settings.
-Built-in models are checked against pinned size/SHA-256 metadata and GGUF
-magic. Historical manifests for those known runtime IDs are normalized to the
-same canonical integrity metadata, so missing server-side checksum fields
-cannot weaken validation. Missing or failed adapters raise an error; the SDK
-never silently falls back to an unadapted base model.
-
 ### Remote inference
 
 ```python
@@ -139,17 +128,10 @@ base = paw.function(None, interpreter="gpt2")
 output = base("raw prompt text")
 ```
 
-This mode is intentionally explicit:
+Model files download on first use. Pass `offline=True` to use cached files only.
+Each call is independent.
 
-- `paw.function()` still requires the `program_id` argument.
-- `program_id=None` without `interpreter` raises `ValueError`.
-- `program_id=""` raises `ValueError` and explains that base mode requires explicit `None`.
-- A non-empty program reference together with `interpreter` raises `ValueError`.
-- No PAW API, slug lookup, program download, adapter load, or disk prefix cache is used.
-- Online mode may download the selected base GGUF and, for image interpreters, its projector from the built-in runtime manifest. Offline mode never downloads.
-- Every invocation resets model state. Text interpreters render and tokenize the complete text prompt; the image interpreter processes ordered text/image content.
-
-The built-in text prompt contracts are versioned with each runtime manifest and contain exactly one `{INPUT_PLACEHOLDER}`:
+The text interpreters format prompts as follows:
 
 ```text
 # Qwen/Qwen3-0.6B
@@ -165,35 +147,36 @@ The built-in text prompt contracts are versioned with each runtime manifest and 
 {INPUT_PLACEHOLDER}
 ```
 
-The Qwen bytes are the exact raw-user rendering of
-`apply_chat_template(add_generation_prompt=True, enable_thinking=False)`.
-Zero-token prompts and prompts that consume the full context window raise
-`ValueError`.
+The Qwen3 interpreter uses its chat template with thinking disabled. GPT-2 uses
+the input as a raw prompt.
 
 ### Local text/image calls
 
-Install `programasweights[vision]` to use Qwen3.5 image inference. The public
-call accepts ordered strings and `paw.Image` objects:
+Install `programasweights[vision]` to run Qwen3.5-0.8B locally. Pass text and
+`paw.Image` objects as separate arguments, in the order the model should read them:
 
 ```python
-with paw.function(None, interpreter="Qwen/Qwen3.5-0.8B") as compare:
-    answer = compare(
-        "Before:", paw.Image("before.png"),
-        "After:", paw.Image("after.png"),
-        "What changed?",
-        max_tokens=128,
-    )
+compare = paw.function(None, interpreter="Qwen/Qwen3.5-0.8B")
+answer = compare(
+    "Before:", paw.Image("before.png"),
+    "After:", paw.Image("after.png"),
+    "What changed?",
+)
+print(answer)
 ```
 
-The adapter-free function sends one user message containing these parts, with
-no injected system message. The pinned model chat template adds the assistant
-prefix with thinking disabled. It also accepts text-only calls. Each call is
-independent; no conversation, image, or recurrent-state cache carries across calls.
+Use the same inputs with a compiled image program:
 
-A compatible image bundle loads through `paw.function("./locator.paw")` and
-uses the same call interface. Its `prompt_template.txt` provides literal system
-instructions; `{INPUT_PLACEHOLDER}` has no substitution meaning in that file.
-Bundle loading still requires a valid adapter and matching runtime metadata.
+```python
+fn = paw.function("./locator.paw")
+answer = fn("Find the red cup.", paw.Image("scene.png"))
+```
+
+`paw.Image(source)` accepts a local file path, encoded image bytes, or a Pillow
+image. For an image URL, download the file first. Plain strings are text inputs.
+To pass a list of text and images, unpack it with `fn(*parts)`.
+
+Image functions return a string. Generation options are passed by keyword:
 
 ```python
 output: str = fn(
@@ -206,57 +189,42 @@ output: str = fn(
 )
 ```
 
-Generation options are keyword-only for image functions. `response_format`
-passes a llama.cpp-compatible JSON response-format specification to the backend;
-always validate returned data, especially when `max_tokens` truncates the output.
-`max_tokens=0` returns an empty string without generation. Empty input lists and
-parts other than strings or `paw.Image` are rejected; unpack an existing list
-with `fn(*parts)`.
+`max_tokens`, `temperature`, and `logits_processor` work as described above for
+text functions. Use `response_format={"type": "json_object"}` to request JSON
+output. With `max_tokens=0`, the function returns an empty string.
 
-Pass `return_info=True` to receive a `paw.FunctionResult` instead of a string:
+#### Result metadata
+
+Pass `return_info=True` to get a `paw.FunctionResult` with the output and timing:
 
 ```python
-result = fn("Find the target:", paw.Image("scene.png"), return_info=True)
+result = fn("Find the red cup.", paw.Image("scene.png"), return_info=True)
 print(result.text)
-print(result.finish_reason)    # Backend reason, e.g. "stop" or "length"; otherwise None.
-print(result.usage)            # Backend token counts, or None when unavailable.
-print(result.elapsed_seconds) # Full call duration through native cleanup.
+print(result.elapsed_seconds)
 ```
 
-The result is immutable and belongs to that call. `usage`, when present, is a
-copied, read-only mapping; use `dict(result.usage)` when logging it as JSON.
-Counts have the backend's semantics; they are not an estimate of image patches
-or billable tokens. `elapsed_seconds` uses a monotonic clock and includes input
-preparation, waiting for function/runtime locks, adapter selection, inference,
-and native cleanup. It excludes loading the function and constructing input
-`paw.Image` objects before the call.
+| Attribute | Description |
+|-----------|-------------|
+| `text` | Generated text. |
+| `finish_reason` | Why generation ended, such as `"stop"` or `"length"`; `None` when unavailable. |
+| `usage` | Read-only token counts; `None` when unavailable. |
+| `elapsed_seconds` | Total call duration in seconds, excluding model loading. |
 
-`return_info` is a keyword-only boolean and defaults to `False`, preserving
-string returns. With `max_tokens=0`, the opt-in result has empty text and `None`
-for both backend fields, because no generation ran. Truncated text is still
-returned with the backend's `"length"` reason; errors still raise normally.
-This option applies to the local Qwen3.5 image runtime, including text-only calls
-to that interpreter and compiled image programs. Existing text runtimes and
-remote inference do not accept this option.
+Results are immutable. To serialize token counts as JSON, use `dict(result.usage)`
+when `usage` is not `None`. A token limit can leave the output incomplete; check
+`finish_reason` for `"length"` when handling truncated results.
 
-`paw.Image(source)` accepts a regular local path, encoded image bytes, or a
-Pillow image and snapshots the supplied content. It does not fetch URLs. Images
-are decoded locally and converted to RGB PNG without SDK resizing, EXIF rotation,
-or ICC conversion. Transparency is composited over white. The backend uses the
-manifest's image-token limits to construct patches; high-bit-depth and floating
-point inputs require explicit conversion by the caller.
+`return_info` is available for local Qwen3.5 functions, including text-only calls
+and compiled image programs.
 
-Live functions share a model/projector only when the exact asset hashes,
-preprocessing, context size, GPU settings, and verbosity match. Shared calls
-serialize and switch adapters; closing one function leaves other users of that
-runtime usable. Close the last function to release native resources. Native
-runtimes must not be inherited through `fork`; use a spawned process instead.
+#### Offline use and closing functions
 
-The built-in image interpreter pins a Q8_0 model and BF16 projector by repository
-revision, size, and SHA-256. Existing bundles retain their own exact asset
-identities; naming the same upstream model does not make different GGUF files
-interchangeable. Offline mode requires both verified files. Remote image
-inference and hosted image compilation are not introduced by this interface.
+Model files download on first use. Once cached, pass `offline=True` to
+`paw.function` to load without network access.
+
+Call `fn.close()` when finished, or use `with paw.function(...) as fn:` to close
+automatically. For multiprocessing, start workers with `spawn` and load the
+function inside each worker.
 
 ## Preparing programs for offline use
 

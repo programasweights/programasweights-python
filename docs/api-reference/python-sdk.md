@@ -203,16 +203,10 @@ print(result.usage)            # Token counts, or None when unavailable.
 print(result.elapsed_seconds)  # Total call time in seconds.
 ```
 
-| Attribute | Description |
-|-----------|-------------|
-| `text` | Generated text. |
-| `finish_reason` | Why generation ended, such as `"stop"` or `"length"`; `None` when unavailable. |
-| `usage` | Read-only token counts; `None` when unavailable. |
-| `elapsed_seconds` | Total call duration in seconds, excluding model loading. |
-
-Results are immutable. To serialize token counts as JSON, use `dict(result.usage)`
-when `usage` is not `None`. A token limit can leave the output incomplete; check
-`finish_reason` for `"length"` when handling truncated results.
+The result and its `usage` mapping are read-only. Use `dict(result.usage)`
+for JSON serialization when token counts are available. `elapsed_seconds`
+measures the full call, excluding model loading and construction of
+`paw.Image` inputs.
 
 `return_info` is available for local Qwen3.5 functions, including text-only calls
 and compiled image programs.

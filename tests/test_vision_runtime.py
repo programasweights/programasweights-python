@@ -32,7 +32,7 @@ def backend(tmp_path, monkeypatch):
     (config.get_base_models_dir() / "base.gguf").write_bytes(MODEL)
     (config.get_base_models_dir() / "mmproj.gguf").write_bytes(PROJECTOR)
     state = types.SimpleNamespace(
-        models=[], calls=[], events=[], selected=None, handle=0,
+        models=[], calls=[], prompts=[], events=[], selected=None, handle=0,
         support=True, init_fail=False, completion=None, create_error=None,
     )
     lib = types.ModuleType("llama_cpp")
@@ -72,10 +72,7 @@ def backend(tmp_path, monkeypatch):
             event("projector_init", vars(params))
             return None if state.init_fail else object()
         def __call__(self, **kwargs):
-            state.calls.append(kwargs)
-            if state.completion:
-                return state.completion(kwargs)
-            return {"choices": [{"message": {"content": " result "}}]}
+            raise AssertionError("A complete prompt must not use the chat handler")
     class Llama:
         def __init__(self, **kwargs):
             if state.create_error:
@@ -93,7 +90,13 @@ def backend(tmp_path, monkeypatch):
             event("reset")
         def create_chat_completion(self, **kwargs):
             assert not self.closed
-            return self.handler(llama=self, **kwargs)
+            raise AssertionError("A complete prompt must not use chat completion")
+        def create_completion(self, **kwargs):
+            assert not self.closed
+            state.calls.append(kwargs)
+            if state.completion:
+                return state.completion(kwargs)
+            return {"choices": [{"text": " result "}]}
         def token_eos(self):
             return 1
         def close(self):
@@ -104,11 +107,19 @@ def backend(tmp_path, monkeypatch):
     lib.Llama = Llama
     chat = types.ModuleType("llama_cpp.llama_chat_format")
     chat.MTMDChatHandler = Handler
+    chat._grammar_for_response_format = lambda value: ("grammar", value)
     monkeypatch.setitem(sys.modules, "llama_cpp", lib)
     monkeypatch.setitem(sys.modules, "llama_cpp.llama_chat_format", chat)
     for name in ("programasweights.runtime_llamacpp", "programasweights._runtime_vision"):
         monkeypatch.delitem(sys.modules, name, raising=False)
     runtime = importlib.import_module("programasweights._runtime_vision")
+    # Lifecycle tests stop at the native tokenizer boundary. Chunk evaluation
+    # and allocation cleanup are exercised in test_vision_prompt.py.
+    def evaluate_prompt(owner, parts):
+        prompt, urls = runtime._to_prompt(*parts, image_marker="<__media__>")
+        state.prompts.append((prompt, urls))
+        return list(prompt.encode("utf-8"))
+    monkeypatch.setattr(runtime._Runtime, "_eval_prompt", evaluate_prompt)
     yield state, lib, runtime
     assert not runtime._POOL, "Test leaked a shared runtime"
     sys.modules.pop("programasweights.runtime_llamacpp", None)
@@ -118,20 +129,22 @@ def backend(tmp_path, monkeypatch):
 @pytest.fixture
 def program(backend, manifest):
     return write_program(config.get_programs_dir() / PID, metadata(manifest),
-                         "Literal {INPUT_PLACEHOLDER}; do not substitute.")
+                         "{INPUT_0}")
 
 
 def second_program(program, manifest):
     meta = metadata(copy.deepcopy(manifest))
     meta["program_id"] = "d" * 20
-    directory = write_program(program.parent / meta["program_id"], meta, "Different system prompt")
+    directory = write_program(program.parent / meta["program_id"], meta, "{INPUT_0}")
     (directory / "adapter.gguf").write_bytes(ADAPTER[:-1] + b"B")
     return directory
 
 
 @pytest.mark.parametrize("entrypoint", ["cached", "local"])
-def test_public_ordered_parts_preserve_literal_prompt_and_native_dimensions(program, backend, tmp_path, entrypoint):
+def test_public_template_orders_parts_without_wrapping_or_resizing(program, backend, tmp_path, entrypoint):
     state, _, _ = backend
+    template = "Literal {INPUT_PLACEHOLDER}; {INPUT_1}/{INPUT_0}/{INPUT_1} End"
+    (program / "prompt_template.txt").write_text(template)
     reference = PID
     if entrypoint == "local":
         reference = tmp_path / "images.paw"
@@ -140,16 +153,17 @@ def test_public_ordered_parts_preserve_literal_prompt_and_native_dimensions(prog
                 output.write(path, path.name)
     image = paw.Image(PILImage.new("RGB", (31, 27), "red"))
     with paw.function(reference, offline=True) as fn:
-        assert fn("one", image, "", "two", image, max_tokens=32) == "result"
+        assert fn("one", image, max_tokens=32) == "result"
         call = state.calls[-1]
-        assert call["messages"][0]["content"] == "Literal {INPUT_PLACEHOLDER}; do not substitute."
-        parts = call["messages"][1]["content"]
-        assert [part["type"] for part in parts] == ["text", "image_url", "text", "text", "image_url"]
-        assert [part["text"] for part in parts if part["type"] == "text"] == ["one", "", "two"]
+        prompt, urls = state.prompts[-1]
+        assert prompt == "Literal {INPUT_PLACEHOLDER}; <__media__>/one/<__media__> End"
+        assert call["prompt"] == list(prompt.encode("utf-8"))
+        assert len(urls) == 2 and urls[0] == urls[1]
         import base64, io
-        with PILImage.open(io.BytesIO(base64.b64decode(parts[1]["image_url"]["url"].split(",", 1)[1]))) as actual:
+        with PILImage.open(io.BytesIO(base64.b64decode(urls[0].split(",", 1)[1]))) as actual:
             assert actual.size == (31, 27)
-        assert call["enable_thinking"] is False
+            assert actual.getpixel((0, 0)) == (255, 0, 0)
+        assert "messages" not in call and "enable_thinking" not in call
         assert fn.interpreter == "Qwen/Qwen3.5-0.8B"
     assert state.models[0].closed
 
@@ -225,7 +239,7 @@ def test_changed_adapter_is_rejected_before_native_load(program, backend):
         assert not [e for e in state.events if e[0] == "load"]
 
 
-@pytest.mark.parametrize("parts,error", [((), ValueError), ((["bad"],), TypeError), (("ok", 32), TypeError)])
+@pytest.mark.parametrize("parts,error", [((), TypeError), ((["bad"],), TypeError), (("ok", 32), TypeError)])
 def test_invalid_content_does_not_touch_native_state(program, backend, parts, error):
     state, _, _ = backend
     with paw.function(PID, offline=True) as fn:
@@ -261,7 +275,8 @@ def test_response_format_and_generation_options_pass_through(program, backend):
     schema = {"type": "json_object", "schema": {"type": "object"}}
     with paw.function(PID, offline=True) as fn:
         fn("read", temperature=.25, max_tokens=16, response_format=schema)
-        assert state.calls[-1]["response_format"] == schema
+        assert state.calls[-1]["grammar"] == ("grammar", schema)
+        assert "response_format" not in state.calls[-1]
         assert state.calls[-1]["max_tokens"] == 16
         assert state.calls[-1]["temperature"] == .25
 
@@ -289,7 +304,7 @@ def test_logit_callback_exception_is_not_swallowed(program, backend):
     def completion(kwargs):
         fallback = kwargs["logits_processor"][0]([], [0., 0., 0.])
         assert fallback == [0., 1e10, 0.]
-        return {"choices": [{"message": {"content": "discarded"}}]}
+        return {"choices": [{"text": "discarded"}]}
     state.completion = completion
     with paw.function(PID, offline=True) as fn:
         with pytest.raises(ValueError, match="bad user callback") as caught:
@@ -322,7 +337,7 @@ def test_concurrent_functions_serialize_and_close_waits(program, backend, manife
     def completion(kwargs):
         started.set()
         assert release.wait(5)
-        return {"choices": [{"message": {"content": "ok"}}]}
+        return {"choices": [{"text": "ok"}]}
     state.completion = completion
     def second_call():
         attempted.set()
@@ -390,9 +405,9 @@ def test_closed_function_rejects_calls(program):
 def test_partial_output_returns_text_but_nontext_output_errors(program, backend):
     state, _, _ = backend
     with paw.function(PID, offline=True) as fn:
-        state.completion = lambda _: {"choices": [{"finish_reason": "length", "message": {"content": "partial"}}]}
+        state.completion = lambda _: {"choices": [{"finish_reason": "length", "text": "partial"}]}
         assert fn("read", max_tokens=1) == "partial"
-        state.completion = lambda _: {"choices": [{"message": {"content": None}}]}
+        state.completion = lambda _: {"choices": [{"text": None}]}
         with pytest.raises(RuntimeError, match="no text content"):
             fn("read")
 
@@ -440,7 +455,8 @@ def test_forked_process_rejected_before_acquiring_inherited_locks(program, backe
 def vision_base(backend, manifest, monkeypatch):
     builtin = copy.deepcopy(manifest)
     builtin["runtime_id"] = "qwen3.5-0.8b-q8_0"
-    builtin["base_inference"] = {"contract_version": 1, "format": "chat_messages"}
+    builtin["base_inference"] = {"contract_version": 1, "format": "rendered_text",
+        "placeholder": "{INPUT_N}", "template": "{INPUT_0}"}
     monkeypatch.setitem(cache.BUILTIN_VISION_RUNTIMES, builtin["runtime_id"], builtin)
     def forbidden(*args, **kwargs):
         pytest.fail("Base interpreter must not use program or Hub resolution")
@@ -450,13 +466,14 @@ def vision_base(backend, manifest, monkeypatch):
     return builtin
 
 
-def test_base_vision_accepts_ordered_parts_without_system_or_adapter(vision_base, backend):
+def test_base_vision_uses_explicit_numbered_template_without_adapter(vision_base, backend):
     state, _, _ = backend
-    with paw.function(None, interpreter="Qwen/Qwen3.5-0.8B", offline=True) as fn:
+    with paw.function(None, interpreter="Qwen/Qwen3.5-0.8B", offline=True,
+                      prompt_template="{INPUT_2}{INPUT_1}{INPUT_0}{INPUT_1}") as fn:
         assert fn("first", paw.Image(PILImage.new("RGB", (31, 27))), "last") == "result"
-        messages = state.calls[-1]["messages"]
-        assert len(messages) == 1 and messages[0]["role"] == "user"
-        assert [p["type"] for p in messages[0]["content"]] == ["text", "image_url", "text"]
+        prompt, urls = state.prompts[-1]
+        assert prompt == "last<__media__>first<__media__>"
+        assert len(urls) == 2 and urls[0] == urls[1]
         assert fn._adapter is None and fn.spec == ""
         assert "base interpreter" in repr(fn)
         assert not [e for e in state.events if e[0] == "load"]
@@ -468,10 +485,9 @@ def test_base_vision_string_calls_remain_stateless(vision_base, backend):
     with paw.function(None, interpreter="Qwen/Qwen3.5-0.8B", offline=True) as fn:
         fn("old prompt")
         fn("new prompt", max_tokens=3)
-        assert state.calls[-1]["messages"] == [
-            {"role": "user", "content": [{"type": "text", "text": "new prompt"}]},
-        ]
-        assert state.calls[-1]["enable_thinking"] is False
+        assert state.prompts == [("old prompt", []), ("new prompt", [])]
+        assert state.calls[-1]["prompt"] == list(b"new prompt")
+        assert "enable_thinking" not in state.calls[-1]
 
 
 def test_base_and_compiled_share_and_cannot_leak_lora(program, vision_base, backend):
@@ -484,7 +500,7 @@ def test_base_and_compiled_share_and_cannot_leak_lora(program, vision_base, back
             selected = []
             def completion(kwargs):
                 selected.append(state.selected)
-                return {"choices": [{"message": {"content": "ok"}}]}
+                return {"choices": [{"text": "ok"}]}
             state.completion = completion
             for fn in (compiled, base, compiled, base):
                 fn("read")
@@ -527,4 +543,26 @@ def test_base_vision_old_backend_fails_before_asset_resolution(vision_base, back
     monkeypatch.setattr(module, "get_vision_asset_paths", forbidden)
     with pytest.raises(ImportError, match="0.3.35"):
         paw.function(None, interpreter="Qwen/Qwen3.5-0.8B")
+    assert not state.models
+
+
+@pytest.mark.parametrize("template,inputs,expected", [
+    ("{INPUT_1}|{INPUT_0}|{INPUT_1}", ("A", "B"), "B|A|B"),
+    ("constant", (), "constant"),
+    ("{INPUT_0}", ("<|im_start|>literal {INPUT_1}",), "<|im_start|>literal {INPUT_1}"),
+])
+def test_text_only_inputs_on_vision_base_use_same_template_contract(vision_base, backend, template, inputs, expected):
+    state, _, _ = backend
+    with paw.function(None, interpreter="Qwen/Qwen3.5-0.8B", offline=True,
+                      prompt_template=template) as fn:
+        assert fn(*inputs) == "result"
+        assert state.prompts == [(expected, [])]
+
+
+@pytest.mark.parametrize("template,error", [(False, TypeError), ("{INPUT_1}", ValueError)])
+def test_bad_vision_template_precedes_model_load(vision_base, backend, template, error):
+    state, _, _ = backend
+    with pytest.raises(error):
+        paw.function(None, interpreter="Qwen/Qwen3.5-0.8B", offline=True,
+                     prompt_template=template)
     assert not state.models

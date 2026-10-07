@@ -36,7 +36,9 @@ def _copy_pixels(source):
 class Image:
     """An image to pass to a local image function.
 
-    Accepts a file path, encoded image bytes, or a Pillow image. For example:
+    Accepts a file path, encoded image bytes, or a Pillow image. Pass it as a
+    positional argument to the function's numbered prompt template. For example,
+    when the template uses {INPUT_0} for the question and {INPUT_1} for an image:
     ``fn("Describe this image.", paw.Image("photo.png"))``.
     """
 

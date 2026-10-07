@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add `prompt_template=` for local adapter-free text and image interpreters,
+  using shared numbered positional placeholders with repeatable, ordered slots.
+- Execute complete image prompt templates directly, without an added chat
+  wrapper. Older experimental image bundles must be re-exported with the
+  `rendered_text` / `{INPUT_N}` contract and a complete prompt template.
+- Preserve existing compiled text templates, call conventions and prefix caches.
+
 ## 0.4.12 (2026-10-07)
 
 - Add local Qwen3.5-0.8B functions with ordered text and `paw.Image` inputs,

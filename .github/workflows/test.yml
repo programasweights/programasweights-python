@@ -93,6 +93,7 @@ jobs:
             tests/test_compile_timeouts.py \
             tests/test_local_program.py \
             tests/test_base_interpreter.py \
+            tests/test_numbered_templates.py \
             tests/test_cli_auth.py \
             tests/test_remote_inference.py \
             tests/test_desktop_sdk.py \
@@ -102,6 +103,7 @@ jobs:
             tests/test_vision_metadata.py \
             tests/test_vision_assets.py \
             tests/test_vision_runtime.py \
+            tests/test_vision_prompt.py \
             tests/test_vision_result.py \
             tests/test_sdk.py::TestInstallAndImport
 

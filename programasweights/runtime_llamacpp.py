@@ -24,6 +24,7 @@ import llama_cpp
 from llama_cpp import Llama
 
 from . import cache
+from ._prompt_template import bind_template, parse_template
 
 _NATIVE_STDERR_LOCK = threading.RLock()
 
@@ -84,6 +85,7 @@ class PawFunction:
         self._adapter = None
         self._closed = False
         self._mode = "compiled"
+        self._template_segments = None
         self._program_dir = Path(program_dir)
         self._verbose = verbose
         self._n_ctx = n_ctx
@@ -178,8 +180,8 @@ class PawFunction:
                     )
                 self._apply_adapter(1.0)
 
-            prefix_text, self._suffix_text = self._template.split(
-                cache.INPUT_PLACEHOLDER,
+            prefix_text, _, self._suffix_text = parse_template(
+                self._template, cache.INPUT_PLACEHOLDER,
             )
             self._prefix_tokens = self._llm.tokenize(
                 prefix_text.encode("utf-8"),
@@ -202,13 +204,15 @@ class PawFunction:
         n_gpu_layers: int = -1,
         verbose: bool = False,
         offline: bool = False,
+        prompt_template: str | None = None,
     ) -> "PawFunction":
-        """Create an adapter-free base interpreter with a built-in prompt."""
+        """Create a base interpreter with its default or a numbered template."""
         self = cls.__new__(cls)
         self._llm = None
         self._adapter = None
         self._closed = False
         self._mode = "base"
+        self._template_segments = None
         self._program_dir = None
         self._verbose = verbose
         self._n_ctx = n_ctx
@@ -217,7 +221,15 @@ class PawFunction:
 
         try:
             runtime_manifest = cache.get_base_runtime_manifest(interpreter)
-            self._template = cache.get_base_prompt_template(runtime_manifest)
+            if prompt_template is None:
+                self._template = cache.get_base_prompt_template(runtime_manifest)
+            else:
+                if not isinstance(prompt_template, str):
+                    raise TypeError("prompt_template must be a string.")
+                self._template = prompt_template
+                self._template_segments = parse_template(
+                    prompt_template, "{INPUT_N}",
+                )
             self._interpreter = interpreter
             self._meta = {
                 "mode": "base",
@@ -393,7 +405,43 @@ class PawFunction:
                 except OSError:
                     pass
 
-    def __call__(
+    def __call__(self, *args, **kwargs) -> str:
+        """Run with the input convention selected when the function was loaded.
+
+        Explicit numbered templates bind positional strings and take generation
+        options by keyword. Existing functions retain input_text= and positional
+        max_tokens, temperature and logits_processor arguments.
+        """
+        if self._template_segments is not None:
+            return self._call_numbered(*args, **kwargs)
+        return self._call_single_input(*args, **kwargs)
+
+    def _call_numbered(
+        self,
+        *inputs: str,
+        max_tokens: int | None = None,
+        temperature: float = 0.0,
+        logits_processor: llama_cpp.LogitsProcessorList | None = None,
+    ) -> str:
+        if self._closed or self._llm is None:
+            raise RuntimeError("This PawFunction has been closed.")
+        if any(not isinstance(value, str) for value in inputs):
+            raise TypeError("Text-only interpreters require string arguments.")
+        bound = bind_template(self._template_segments, *inputs)
+        if max_tokens is not None and (
+            not isinstance(max_tokens, int)
+            or isinstance(max_tokens, bool)
+            or max_tokens < 0
+        ):
+            raise ValueError("max_tokens must be None or a non-negative integer.")
+        return self._complete_base_prompt(
+            "".join(bound),
+            max_tokens=max_tokens,
+            temperature=temperature,
+            logits_processor=logits_processor,
+        )
+
+    def _call_single_input(
         self,
         input_text: str,
         max_tokens: int | None = None,
@@ -427,32 +475,16 @@ class PawFunction:
             raise ValueError("max_tokens must be None or a non-negative integer.")
 
         if self._mode == "base":
-            reset = getattr(self._llm, "reset", None)
-            if not callable(reset):
-                raise RuntimeError(
-                    "The installed llama-cpp runtime cannot reset model state."
-                )
-            reset()
             rendered_prompt = self._template.replace(
                 cache.INPUT_PLACEHOLDER,
                 input_text,
                 1,
             )
-            prompt_tokens = self._llm.tokenize(
-                rendered_prompt.encode("utf-8"),
-                add_bos=False,
-                special=True,
-            )
-            if not prompt_tokens:
-                raise ValueError(
-                    "The rendered base prompt tokenized to zero tokens."
-                )
-            return self._generate(
-                prompt_tokens,
+            return self._complete_base_prompt(
+                rendered_prompt,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 logits_processor=logits_processor,
-                token_description="prompt",
             )
 
         self._llm.n_tokens = self._n_prefix
@@ -470,6 +502,35 @@ class PawFunction:
             logits_processor=logits_processor,
             prior_tokens=self._n_prefix,
             token_description="input",
+        )
+
+    def _complete_base_prompt(
+        self,
+        rendered_prompt: str,
+        *,
+        max_tokens: int | None,
+        temperature: float,
+        logits_processor: llama_cpp.LogitsProcessorList | None,
+    ) -> str:
+        reset = getattr(self._llm, "reset", None)
+        if not callable(reset):
+            raise RuntimeError(
+                "The installed llama-cpp runtime cannot reset model state."
+            )
+        reset()
+        prompt_tokens = self._llm.tokenize(
+            rendered_prompt.encode("utf-8"),
+            add_bos=False,
+            special=True,
+        )
+        if not prompt_tokens:
+            raise ValueError("The rendered base prompt tokenized to zero tokens.")
+        return self._generate(
+            prompt_tokens,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            logits_processor=logits_processor,
+            token_description="prompt",
         )
 
     def _generate(

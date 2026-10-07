@@ -1,9 +1,8 @@
 """Inert v2 runtime metadata for local text/image functions.
 
-The existing prompt_template.txt member holds literal system instructions.
-Each call appends one user message containing its ordered text/image parts;
-there are no string placeholders or named image slots. The qwen3.5 chat
-profile adds the assistant generation prompt with thinking disabled.
+The prompt_template.txt member holds the complete rendered prompt template.
+Numbered placeholders bind positional text/image arguments. The template owns
+roles, separators, and the assistant prefix; no chat template is applied.
 
 Preprocessing v1 uses native input dimensions, RGB with transparency over
 white, stored pixel orientation, and no color-profile transform. Resizing and
@@ -21,10 +20,8 @@ VISION_MANIFEST_VERSION = 2
 _SHA256 = re.compile(r"^[a-fA-F0-9]{64}$")
 _INPUT = {"format": "content_parts", "types": ["text", "image"]}
 _PROMPT = {
-    "format": "chat_messages",
-    "system_prompt_file": "prompt_template.txt",
-    "chat_format": "qwen3.5",
-    "enable_thinking": False,
+    "format": "rendered_text",
+    "placeholder": "{INPUT_N}",
 }
 _PREPROCESSING = {
     "version": 1,
@@ -35,10 +32,14 @@ _PREPROCESSING = {
     "resize": "backend",
 }
 
-# A base call is one user message containing the ordered input parts. The
-# pinned GGUF chat template adds the assistant prefix with thinking disabled;
-# no system message or compiled prompt is inserted in adapter-free mode.
-VISION_BASE_INFERENCE = {"contract_version": 1, "format": "chat_messages"}
+# The default base template passes one argument through unchanged.
+# Callers supply the complete prompt; no conversation wrapper is inserted.
+VISION_BASE_INFERENCE = {
+    "contract_version": 1,
+    "format": "rendered_text",
+    "placeholder": "{INPUT_N}",
+    "template": "{INPUT_0}",
+}
 
 BUILTIN_VISION_RUNTIMES = {
     "qwen3.5-0.8b-q8_0": {
@@ -125,7 +126,7 @@ def valid_vision_contract(manifest: dict) -> bool:
     if manifest.get("input") != _INPUT:
         return False
     prompt = manifest.get("prompt_template")
-    if prompt != _PROMPT or prompt.get("enable_thinking") is not False:
+    if prompt != _PROMPT:
         return False
     assets = manifest.get("program_assets")
     if (

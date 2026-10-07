@@ -125,17 +125,32 @@ Install the optional image dependencies:
 pip install "programasweights[vision]" --extra-index-url https://pypi.programasweights.com/simple/
 ```
 
-Prompt Qwen3.5-0.8B locally with text and images (no adapter applied):
+The unreleased numbered-template API lets you specify the complete prompt for
+text-only or image-capable base models. For Qwen3.5-0.8B with no adapter:
 
 ```python
 import programasweights as paw
 
-describe = paw.function(None, interpreter="Qwen/Qwen3.5-0.8B")
-print(describe("Describe this image.", paw.Image("photo.png")))
+prompt = (
+    "<|im_start|>user\n{INPUT_0}\n{INPUT_1}<|im_end|>\n"
+    "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+)
+with paw.function(
+    None, interpreter="Qwen/Qwen3.5-0.8B", prompt_template=prompt,
+) as describe:
+    print(describe("Describe this image.", paw.Image("photo.png")))
 ```
 
-To use a compiled image program, load its `.paw` file with
-`paw.function("./locator.paw")`.
+`{INPUT_0}`, `{INPUT_1}`, and subsequent numbered slots bind positional arguments
+where they appear in the template. Slots may repeat or change order. The SDK
+adds no chat wrapper; the template supplies roles and the assistant prefix.
+The same option supports text-only models such as `Qwen/Qwen3-0.6B`, with string
+arguments. Existing text calls without this option retain their behavior.
+
+Compiled image programs read the complete template from their `.paw` bundle:
+load with `paw.function("./locator.paw")` and supply the arguments its slots
+require. Older experimental image bundles using `chat_messages` metadata must
+be re-exported with a complete numbered template; there is no automatic fallback.
 
 See the [image API reference](https://programasweights.readthedocs.io/en/latest/api-reference/python-sdk/#local-textimage-calls)
 for multiple images, input formats, and result metadata.

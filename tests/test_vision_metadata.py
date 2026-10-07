@@ -40,10 +40,8 @@ def manifest():
         "adapter_format": "gguf_lora",
         "input": {"format": "content_parts", "types": ["text", "image"]},
         "prompt_template": {
-            "format": "chat_messages",
-            "system_prompt_file": "prompt_template.txt",
-            "chat_format": "qwen3.5",
-            "enable_thinking": False,
+            "format": "rendered_text",
+            "placeholder": "{INPUT_N}",
         },
         "program_assets": {"adapter_filename": "adapter.gguf"},
         "local_sdk": {
@@ -126,7 +124,7 @@ def test_required_contract_sections_cannot_be_omitted(manifest, path):
     (("manifest_version",), 3), (("manifest_version",), 1),
     (("input", "types"), ["text"]), (("input", "types"), ["image", "audio"]),
     (("input", "format"), "named_slots"), (("input", "extra"), True),
-    (("prompt_template", "format"), "rendered_text"),
+    (("prompt_template", "format"), "chat_messages"),
     (("prompt_template", "chat_format"), "unknown"),
     (("prompt_template", "system_prompt_file"), "../prompt.txt"),
     (("prompt_template", "enable_thinking"), True),
@@ -316,7 +314,8 @@ assert cache._normalize_runtime_manifest(manifest) == manifest
 
 def test_builtin_vision_base_contract_is_complete_and_defensively_copied():
     original = cache.get_base_runtime_manifest("Qwen/Qwen3.5-0.8B")
-    assert original["base_inference"] == {"contract_version": 1, "format": "chat_messages"}
+    assert original["base_inference"] == {"contract_version": 1, "format": "rendered_text",
+        "placeholder": "{INPUT_N}", "template": "{INPUT_0}"}
     assert cache._normalize_runtime_manifest(original) == original
     clone = cache.get_base_runtime_manifest("Qwen/Qwen3.5-0.8B")
     clone["local_sdk"]["vision"]["preprocessing"]["image_max_tokens"] = 64
@@ -339,7 +338,8 @@ def test_named_builtin_pins_both_asset_identities(which, field, value):
 
 
 @pytest.mark.parametrize("contract", [
-    {"contract_version": 1, "format": "chat_messages"},
+    {"contract_version": 1, "format": "rendered_text",
+        "placeholder": "{INPUT_N}", "template": "{INPUT_0}"},
     None,
 ])
 def test_vision_base_contract_optional_for_compiled_artifacts(manifest, contract):
@@ -357,3 +357,27 @@ def test_vision_base_contract_optional_for_compiled_artifacts(manifest, contract
 def test_unsupported_vision_base_contract_rejected(manifest, contract):
     manifest["base_inference"] = contract
     assert cache._normalize_runtime_manifest(manifest) is None
+
+
+@pytest.mark.parametrize("template", ["{INPUT_0}", "{INPUT_0}{INPUT_0}", "{INPUT_1} then {INPUT_0}"])
+def test_numbered_image_templates_import_without_rewriting(tmp_path, manifest, template):
+    path = write_program(tmp_path / "source", metadata(manifest), template)
+    assert cache.validate_program_assets_dir(path, PID)
+    assert (path / "prompt_template.txt").read_text() == template
+
+
+@pytest.mark.parametrize("template", ["{INPUT_1}", "{INPUT_0}{INPUT_2}"])
+def test_image_template_gaps_rejected_before_execution(tmp_path, manifest, template):
+    path = write_program(tmp_path / "source", metadata(manifest), template)
+    assert not cache.validate_program_assets_dir(path, PID)
+
+
+def test_old_image_chat_contract_is_rejected_without_text_fallback(tmp_path, manifest):
+    manifest["prompt_template"] = {
+        "format": "chat_messages", "system_prompt_file": "prompt_template.txt",
+        "chat_format": "qwen3.5", "enable_thinking": False,
+    }
+    path = write_program(tmp_path / "source", metadata(manifest), "{INPUT_0}")
+    assert cache.declares_vision(metadata(manifest))
+    assert cache.resolve_runtime_manifest(metadata(manifest)) is None
+    assert not cache.validate_program_assets_dir(path, PID)

@@ -191,7 +191,7 @@ output: str = fn(
 
 `max_tokens`, `temperature`, and `logits_processor` work as described above for
 text functions. Use `response_format={"type": "json_object"}` to request JSON
-output. With `max_tokens=0`, the function returns an empty string.
+output.
 
 #### Result metadata
 

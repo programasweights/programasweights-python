@@ -1,7 +1,9 @@
 """Opt-in result metadata at the native boundary; no models or network used."""
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import FrozenInstanceError
+import multiprocessing
+import pickle
 import threading
 
 import pytest
@@ -13,6 +15,49 @@ from test_vision_runtime import backend, program, second_program, vision_base
 def completion(text=" result ", reason="stop", usage=None):
     return {"choices": [{"message": {"content": text}, "finish_reason": reason}],
             "usage": usage}
+
+
+def _result_from_worker(usage):
+    return paw.FunctionResult("résultat", "stop", usage, 0.125)
+
+
+def _assert_restored_result(result, usage):
+    assert isinstance(result, paw.FunctionResult)
+    assert (result.text, result.finish_reason, result.elapsed_seconds) == (
+        "résultat", "stop", 0.125,
+    )
+    if usage is None:
+        assert result.usage is None
+    else:
+        assert result.usage == usage
+        with pytest.raises(TypeError):
+            result.usage["prompt_tokens"] = 0
+    for name in ("text", "finish_reason", "usage", "elapsed_seconds"):
+        with pytest.raises(FrozenInstanceError):
+            setattr(result, name, None)
+
+
+@pytest.mark.parametrize("usage", [None, {}, {
+    "prompt_tokens": 13, "completion_tokens": 2, "total_tokens": 15,
+}])
+@pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
+def test_result_pickle_round_trip_preserves_metadata_and_immutability(usage, protocol):
+    original = _result_from_worker(usage)
+    restored = pickle.loads(pickle.dumps(original, protocol=protocol))
+    assert restored is not original
+    _assert_restored_result(restored, usage)
+
+
+def test_spawned_worker_can_return_results_with_immutable_metadata():
+    usages = [None, {}, {
+        "prompt_tokens": 13, "completion_tokens": 2, "total_tokens": 15,
+    }]
+    with ProcessPoolExecutor(
+        max_workers=1, mp_context=multiprocessing.get_context("spawn"),
+    ) as executor:
+        for usage in usages:
+            result = executor.submit(_result_from_worker, usage).result(timeout=30)
+            _assert_restored_result(result, usage)
 
 
 @pytest.mark.parametrize("reason", ["stop", "length", "backend-specific", None])

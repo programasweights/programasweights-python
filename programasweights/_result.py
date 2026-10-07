@@ -22,3 +22,14 @@ class FunctionResult:
     def __post_init__(self):
         if self.usage is not None:
             object.__setattr__(self, "usage", MappingProxyType(dict(self.usage)))
+
+    def __reduce__(self):
+        return (
+            type(self),
+            (
+                self.text,
+                self.finish_reason,
+                None if self.usage is None else dict(self.usage),
+                self.elapsed_seconds,
+            ),
+        )

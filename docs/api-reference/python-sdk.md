@@ -269,11 +269,6 @@ The image runtime manifest declares the template contract as:
 
 This is the template field inside the full runtime manifest, not a standalone
 manifest. Keep the required model, projector, preprocessing and adapter metadata.
-Older experimental image bundles with `chat_messages`, `system_prompt_file`,
-`chat_format` or `enable_thinking` prompt metadata are rejected. Re-export those
-bundles with the new contract and a full template matching the adapter's training
-prompt. Changing the metadata alone does not reconstruct the missing roles or
-assistant prefix. Existing text bundles do not need this migration.
 
 `paw.Image(source)` accepts a local file path, encoded image bytes, or a Pillow
 image. For an image URL, download the file first. Plain strings are text inputs.

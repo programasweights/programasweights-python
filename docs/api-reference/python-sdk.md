@@ -222,12 +222,12 @@ prompt = (
     "Before: {INPUT_1}\nAfter: {INPUT_2}\n{INPUT_0}<|im_end|>\n"
     "<|im_start|>assistant\n<think>\n\n</think>\n\n"
 )
-with paw.function(
+compare = paw.function(
     None, interpreter="Qwen/Qwen3.5-0.8B", prompt_template=prompt,
-) as compare:
-    answer = compare(
-        "What changed?", paw.Image("before.png"), paw.Image("after.png"),
-    )
+)
+answer = compare(
+    "What changed?", paw.Image("before.png"), paw.Image("after.png"),
+)
 print(answer)
 ```
 

@@ -13,7 +13,7 @@ from test_vision_runtime import backend, program, second_program, vision_base
 
 
 def completion(text=" result ", reason="stop", usage=None):
-    return {"choices": [{"message": {"content": text}, "finish_reason": reason}],
+    return {"choices": [{"text": text, "finish_reason": reason}],
             "usage": usage}
 
 
@@ -158,11 +158,11 @@ def test_elapsed_includes_preparation_both_locks_and_cleanup(program, backend, m
     state, _, module = backend
     clock = [100.0]
     monkeypatch.setattr(module, "perf_counter", lambda: clock[0])
-    prepare = module._to_chat_content
-    def prepare_input(*parts):
+    prepare = module._to_prompt
+    def prepare_input(*parts, **kwargs):
         clock[0] += 1
-        return prepare(*parts)
-    monkeypatch.setattr(module, "_to_chat_content", prepare_input)
+        return prepare(*parts, **kwargs)
+    monkeypatch.setattr(module, "_to_prompt", prepare_input)
     class TimedLock:
         def __init__(self, lock, seconds):
             self.lock, self.seconds = lock, seconds
@@ -194,7 +194,7 @@ def test_serialized_calls_keep_their_own_results(program, backend, manifest, sam
     started, release, attempted = threading.Event(), threading.Event(), threading.Event()
     shared_counts = {"completion_tokens": 0}
     def infer(kwargs):
-        text = kwargs["messages"][-1]["content"][0]["text"]
+        text = bytes(kwargs["prompt"]).decode("utf-8")
         if text == "first":
             started.set()
             assert release.wait(5)
@@ -234,7 +234,7 @@ def test_usage_is_copied_before_releasing_the_shared_runtime(program, backend, m
     counts = {"completion_tokens": 0}
     first_done, second_done = threading.Event(), threading.Event()
     def infer(kwargs):
-        text = kwargs["messages"][-1]["content"][0]["text"]
+        text = bytes(kwargs["prompt"]).decode("utf-8")
         counts["completion_tokens"] = 1 if text == "first" else 2
         return completion(text=text, usage=counts)
     state.completion = infer

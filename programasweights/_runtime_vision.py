@@ -21,7 +21,8 @@ from time import perf_counter
 from typing import Literal, Union, overload
 
 from . import cache
-from ._image_content import _to_chat_content
+from ._image_content import _to_prompt
+from ._prompt_template import bind_template, parse_template
 from ._result import FunctionResult
 from ._vision_assets import get_vision_asset_paths
 from ._vision_contract import VISION_BASE_INFERENCE, declares_vision
@@ -72,10 +73,6 @@ class _Runtime:
         from .runtime_llamacpp import _suppress_native_stderr
 
         class Handler(handler_type):
-            def __call__(handler, **kwargs):
-                kwargs["enable_thinking"] = False
-                return super().__call__(**kwargs)
-
             def _init_mtmd_context(handler, model):
                 if handler.mtmd_ctx is not None:
                     return
@@ -161,7 +158,133 @@ class _Runtime:
         if result not in (0, None):
             raise RuntimeError("Failed to select the vision LoRA adapter.")
 
-    def run(self, adapter, messages, *, max_tokens, temperature,
+    def _eval_prompt(self, parts):
+        """Evaluate bound parts after _select has reset the model."""
+        model = self.llm
+        handler = model.chat_handler
+        mtmd = handler._mtmd_cpp
+
+        if model.n_tokens != 0:
+            raise RuntimeError("Prompt evaluation requires a reset runtime.")
+
+        marker = mtmd.mtmd_default_marker().decode("utf-8")
+        prompt, urls = _to_prompt(*parts, image_marker=marker)
+        encoded = prompt.encode("utf-8")
+
+        input_text = mtmd.mtmd_input_text()
+        input_text.text = encoded
+        input_text.text_len = len(encoded)
+        input_text.add_special = False
+        input_text.parse_special = True
+
+        bitmaps = []
+        chunks = None
+        try:
+            for url in urls:
+                bitmap = handler._create_bitmap_from_bytes(
+                    handler.load_image(url)
+                )
+                if not bitmap:
+                    raise RuntimeError("Failed to create image bitmap.")
+                bitmaps.append(bitmap)
+
+            chunks = mtmd.mtmd_input_chunks_init()
+            if not chunks:
+                raise RuntimeError("Failed to allocate prompt chunks.")
+
+            bitmap_array = (
+                mtmd.mtmd_bitmap_p_ctypes * len(bitmaps)
+            )(*bitmaps)
+            result = mtmd.mtmd_tokenize(
+                handler.mtmd_ctx,
+                chunks,
+                ctypes.byref(input_text),
+                bitmap_array,
+                len(bitmaps),
+            )
+            if result != 0:
+                raise ValueError(f"Prompt tokenization failed: {result}.")
+
+            for index in range(mtmd.mtmd_input_chunks_size(chunks)):
+                chunk = mtmd.mtmd_input_chunks_get(chunks, index)
+                if not chunk:
+                    raise RuntimeError("Missing prompt chunk.")
+
+                size = mtmd.mtmd_input_chunk_get_n_tokens(chunk)
+                if model.n_tokens + size >= model.n_ctx():
+                    raise ValueError("Prompt leaves no room for output.")
+
+                kind = mtmd.mtmd_input_chunk_get_type(chunk)
+                if kind == mtmd.MTMD_INPUT_CHUNK_TYPE_TEXT:
+                    count = ctypes.c_size_t()
+                    tokens = mtmd.mtmd_input_chunk_get_tokens_text(
+                        chunk, ctypes.byref(count)
+                    )
+                    if count.value:
+                        if not tokens:
+                            raise RuntimeError("Missing text tokens.")
+                        model.eval([tokens[i] for i in range(count.value)])
+
+                elif kind == mtmd.MTMD_INPUT_CHUNK_TYPE_IMAGE:
+                    start = model.n_tokens
+                    end = self.lib.llama_pos(0)
+                    result = mtmd.mtmd_helper_eval_chunk_single(
+                        handler.mtmd_ctx,
+                        model._ctx.ctx,
+                        chunk,
+                        self.lib.llama_pos(start),
+                        self.lib.llama_seq_id(0),
+                        model.n_batch,
+                        True,
+                        ctypes.byref(end),
+                    )
+                    if result != 0:
+                        raise RuntimeError(
+                            f"Image evaluation failed: {result}."
+                        )
+                    if not start < end.value < model.n_ctx():
+                        raise RuntimeError("Invalid image end position.")
+
+                    # Image embeddings occupy these positions. These zeros
+                    # are Python bookkeeping, not tokens sent to the model.
+                    model.input_ids[start:end.value] = 0
+                    model.n_tokens = end.value
+                    model._requires_eval = False
+                else:
+                    raise ValueError("Unsupported prompt chunk type.")
+
+            if model.n_tokens == 0:
+                raise ValueError("The prompt produced no tokens.")
+
+            return model.input_ids[:model.n_tokens].tolist()
+        finally:
+            if chunks:
+                mtmd.mtmd_input_chunks_free(chunks)
+            for bitmap in bitmaps:
+                mtmd.mtmd_bitmap_free(bitmap)
+
+    def _complete_prompt(
+        self, parts, *, max_tokens, temperature,
+        logits_processor=None, response_format=None,
+    ):
+        """Complete an exact prompt inside the caller's reset, locked runtime."""
+        options = {}
+        if logits_processor is not None:
+            options["logits_processor"] = logits_processor
+        if response_format is not None:
+            from llama_cpp.llama_chat_format import _grammar_for_response_format
+
+            options["grammar"] = _grammar_for_response_format(response_format)
+
+        prompt_tokens = self._eval_prompt(parts)
+        return self.llm.create_completion(
+            prompt=prompt_tokens,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            **options,
+        )
+
+    def run(self, adapter, parts, *, max_tokens, temperature,
             logits_processor=None, response_format=None, return_info=False):
         with self.lock:
             if self.closed:
@@ -193,13 +316,13 @@ class _Runtime:
                     options["logits_processor"] = self.lib.LogitsProcessorList([guarded_processor])
                 if response_format is not None:
                     options["response_format"] = response_format
-                response = self.llm.create_chat_completion(
-                    messages=messages, max_tokens=max_tokens,
+                response = self._complete_prompt(
+                    parts, max_tokens=max_tokens,
                     temperature=temperature, **options,
                 )
                 if processor_error is not None:
                     raise processor_error
-                content = response["choices"][0]["message"]["content"]
+                content = response["choices"][0]["text"]
                 if not isinstance(content, str):
                     raise RuntimeError("The vision function returned no text content.")
                 if return_info:
@@ -263,14 +386,17 @@ class VisionFunction:
         if not declares_vision(self._meta):
             raise ValueError("VisionFunction requires an image program.")
         manifest = cache.resolve_runtime_manifest(self._meta, offline=offline)
-        self._prompt = (directory / "prompt_template.txt").read_text(encoding="utf-8")
+        template = (directory / "prompt_template.txt").read_text(encoding="utf-8")
+        self._segments = parse_template(
+            template, manifest["prompt_template"]["placeholder"],
+        )
         path = directory / "adapter.gguf"
         self._adapter = (path, _digest(path), path.stat().st_size)
         self._acquire_runtime(manifest, n_ctx, n_gpu_layers, verbose, offline)
 
     @classmethod
     def from_base(cls, interpreter, *, n_ctx=2048, n_gpu_layers=-1,
-                  verbose=False, offline=False):
+                  verbose=False, offline=False, prompt_template=None):
         self = cls.__new__(cls)
         self._initialize(n_ctx)
         manifest = cache.get_base_runtime_manifest(interpreter)
@@ -280,7 +406,11 @@ class VisionFunction:
         ):
             raise ValueError("This interpreter has no adapter-free vision contract.")
         self._meta = {"mode": "base", "interpreter": interpreter}
-        self._prompt = None
+        base = manifest["base_inference"]
+        template = base["template"] if prompt_template is None else prompt_template
+        if not isinstance(template, str):
+            raise TypeError("prompt_template must be a string.")
+        self._segments = parse_template(template, base["placeholder"])
         self._adapter = None
         self._acquire_runtime(manifest, n_ctx, n_gpu_layers, verbose, offline)
         return self
@@ -343,17 +473,13 @@ class VisionFunction:
                 raise ValueError("max_tokens must be None or a non-negative integer.")
             if not isinstance(temperature, (int, float)) or not math.isfinite(temperature) or temperature < 0:
                 raise ValueError("temperature must be a finite non-negative number.")
-            content = _to_chat_content(*parts)
+            bound = bind_template(self._segments, *parts)
             if max_tokens == 0:
                 if return_info:
                     return FunctionResult("", None, None, perf_counter() - started)
                 return ""
-            messages = []
-            if self._prompt is not None:
-                messages.append({"role": "system", "content": self._prompt})
-            messages.append({"role": "user", "content": content})
             output = self._runtime.run(
-                self._adapter, messages, max_tokens=max_tokens, temperature=temperature,
+                self._adapter, bound, max_tokens=max_tokens, temperature=temperature,
                 logits_processor=logits_processor, response_format=response_format,
                 return_info=return_info,
             )

@@ -426,6 +426,7 @@ def function(
     *,
     remote: bool = False,
     interpreter: str | None = None,
+    prompt_template: str | None = None,
 ):
     """Load a compiled program, or explicitly load a bare base interpreter.
 
@@ -453,13 +454,22 @@ def function(
         interpreter: Advanced adapter-free mode. This is only valid when
             ``program_id`` is explicitly ``None``. Supported values are
             ``"Qwen/Qwen3-0.6B"``, ``"gpt2"``, and ``"Qwen/Qwen3.5-0.8B"``.
-            Qwen3.5 processes text and ``paw.Image`` arguments in the order
-            provided.
+            Qwen3.5 places text and ``paw.Image`` arguments according to
+            its complete numbered prompt template.
+        prompt_template: Complete numbered template for a local adapter-free
+            interpreter, including text-only models. {INPUT_0}, {INPUT_1}, ...
+            bind positional arguments; generation options are keyword-only
+            when this is supplied. Text-only models require string arguments;
+            image-capable models also accept paw.Image. No chat wrapper is
+            added. Omitting this option preserves the interpreter's default
+            template and call convention. Compiled functions use their bundled
+            prompt_template.txt and do not accept this override.
 
     Returns:
         A callable returning an output string. Text programs accept one input
-        string. Image programs accept ordered positional strings and paw.Image
-        objects, with generation options passed by keyword.
+        string by default. Explicit numbered templates accept positional
+        strings; image programs also accept paw.Image objects. Numbered
+        template calls take generation options by keyword.
 
     Example:
         >>> fn = paw.function("email-triage")
@@ -475,10 +485,25 @@ def function(
         >>> base = paw.function(None, interpreter="gpt2")
 
         >>> vision = paw.function(None, interpreter="Qwen/Qwen3.5-0.8B")
-        >>> vision("Describe this image.", paw.Image("photo.png"))
+        >>> vision(paw.Image("photo.png"))  # default template is {INPUT_0}
+
+        >>> prompted = paw.function(
+        ...     None, interpreter="gpt2",
+        ...     prompt_template="Context: {INPUT_0}. Question: {INPUT_1}. Answer:",
+        ... )
+        >>> prompted("Context goes here.", "What happened?", max_tokens=32)
     """
     import os
     from . import cache
+
+    if prompt_template is not None:
+        if remote or program_id is not None:
+            raise ValueError(
+                "prompt_template requires local adapter-free inference; "
+                "compiled functions use their bundled template."
+            )
+        if not isinstance(prompt_template, str):
+            raise TypeError("prompt_template must be a string.")
 
     offline = _offline_requested(offline)
     if remote:
@@ -514,12 +539,16 @@ def function(
             from .runtime_llamacpp import PawFunction
 
             function_type = PawFunction
+        template_options = (
+            {} if prompt_template is None else {"prompt_template": prompt_template}
+        )
         return function_type.from_base(
             interpreter,
             n_ctx=n_ctx,
             n_gpu_layers=n_gpu_layers,
             verbose=verbose,
             offline=offline,
+            **template_options,
         )
 
     from ._program_reference import local_program_path

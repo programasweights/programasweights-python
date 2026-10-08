@@ -23,9 +23,9 @@ fn = paw.function(
     n_gpu_layers=None,
     verbose=False,
     offline=False,
-    *,
     remote=False,
     interpreter=None,
+    prompt_template=None,
 )
 ```
 
@@ -43,8 +43,10 @@ bundle directly. Required runtime metadata and base models are cached for reuse.
 | `offline` | Use only local files/cache and make zero network calls; fail if required validated assets are missing. `PAW_OFFLINE=1` has the same effect. |
 | `remote` | Run hosted inference without downloading model assets (default `False`). Accepts a `Program` object, ID, or slug. Cannot be combined with offline mode, local file paths, `interpreter`, or non-default local runtime options. |
 | `interpreter` | Advanced adapter-free mode only. Must be passed by keyword and only when `program_id` is explicitly `None`. Supported values are `Qwen/Qwen3-0.6B`, `gpt2`, and `Qwen/Qwen3.5-0.8B`. |
+| `prompt_template` | Unreleased. Optional complete numbered template for a local base interpreter. Pass by keyword with `program_id=None`. Works with text-only and image-capable models. Cannot override a compiled bundle or be used with `remote=True`. |
 
-For local text-only programs, the returned callable accepts:
+For existing local text-only programs and text base interpreters without an
+explicit `prompt_template`, the returned callable accepts:
 
 ```python
 output: str = fn(input_text, max_tokens=None, temperature=0.0, logits_processor=None)
@@ -148,35 +150,131 @@ The text interpreters format prompts as follows:
 ```
 
 The Qwen3 interpreter uses its chat template with thinking disabled. GPT-2 uses
-the input as a raw prompt.
+the input as a raw prompt. These defaults are unchanged when `prompt_template`
+is omitted.
+
+#### Complete numbered templates (unreleased)
+
+For a local base model, pass `prompt_template=` when loading the function to
+specify the complete prompt. This option works for both text-only and
+image-capable interpreters:
+
+```python
+prompt = (
+    "<|im_start|>system\n{INPUT_0}<|im_end|>\n"
+    "<|im_start|>user\n{INPUT_1}<|im_end|>\n"
+    "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+)
+answer = paw.function(
+    None, interpreter="Qwen/Qwen3-0.6B", prompt_template=prompt,
+)
+output = answer(
+    "Answer using only the facts in the question.",
+    "Alice owns three cats. How many cats does Alice own?",
+)
+```
+
+The template controls role delimiters, examples, whitespace, thinking markers
+and the assistant prefix. The SDK adds no chat wrapper. Use the format expected
+by the selected model. Text is tokenized with special tokens recognized and
+without an automatically added BOS prefix. Image-capable models insert the
+required vision tokens and embeddings at image slots.
+
+Numbered templates share these rules across text and image models:
+
+- `{INPUT_0}`, `{INPUT_1}`, etc. refer to positional arguments. Used indices must
+  start at zero without gaps; `{INPUT_1}/{INPUT_0}/{INPUT_1}` is valid.
+- Pass exactly the number of distinct indices. Repeating a slot repeats its
+  content at that position. A nonempty constant template may have no slots and
+  be called with `fn()`.
+- Input strings are inserted literally and are not parsed again for slots.
+  Only canonical numbered placeholders are interpreted. Other brace content is
+  literal; this is not Python `str.format`. Doubled braces do not escape a slot:
+  `{{INPUT_0}}` surrounds the inserted value with literal braces.
+- Text-only models accept strings. Image-capable models accept strings or
+  `paw.Image` in any slot, including calls containing only strings.
+- Generation options are keyword-only for numbered-template calls:
+  `fn("first", "second", max_tokens=32)`.
+
+For an already rendered text prompt, use `prompt_template="{INPUT_0}"`.
+Qwen3.5's default base template is this identity template: it accepts one
+argument unchanged and supplies no conversation wrapper. GPT-2 and Qwen3-0.6B
+keep the default text templates shown above when the option is omitted.
+
+`prompt_template=` is available only with `program_id=None` and local inference.
+Compiled programs use their bundled `prompt_template.txt`; passing an override
+with a compiled program or `remote=True` raises an error.
+
+Existing compiled text programs still require exactly one
+`{INPUT_PLACEHOLDER}`. Their literal text, tokenization boundaries and prefix
+cache behavior are unchanged. Existing text calls such as `fn(input_text="x")`
+and `fn("x", 32)` remain valid; explicit numbered templates use the positional
+inputs and keyword generation options described above.
 
 ### Local text/image calls
 
-Install `programasweights[vision]` to prompt Qwen3.5-0.8B locally
-(no adapter applied). Pass text and `paw.Image` objects in the order
-the model should read them:
+Install `programasweights[vision]` to use Qwen3.5-0.8B. With the unreleased
+numbered-template API, order images and text through the complete template:
 
 ```python
-compare = paw.function(None, interpreter="Qwen/Qwen3.5-0.8B")
+prompt = (
+    "<|im_start|>user\n"
+    "Before: {INPUT_1}\nAfter: {INPUT_2}\n{INPUT_0}<|im_end|>\n"
+    "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+)
+compare = paw.function(
+    None, interpreter="Qwen/Qwen3.5-0.8B", prompt_template=prompt,
+)
 answer = compare(
-    "Before:", paw.Image("before.png"),
-    "After:", paw.Image("after.png"),
-    "What changed?",
+    "What changed?", paw.Image("before.png"), paw.Image("after.png"),
 )
 print(answer)
 ```
 
-Use the same inputs with a compiled image program:
+Here the question is argument zero, but the model receives both images before
+that question. Repeating `{INPUT_1}` would place the first image at each
+occurrence. There is no separate public image marker to insert manually.
+
+For a compiled image program, `prompt_template.txt` contains the complete
+prompt, for example:
+
+```text
+<|im_start|>system
+Locate the requested object.<|im_end|>
+<|im_start|>user
+{INPUT_0}
+{INPUT_1}<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+```
+
+With that template, the call is:
 
 ```python
 fn = paw.function("./locator.paw")
 answer = fn("Find the red cup.", paw.Image("scene.png"))
 ```
 
+The image runtime manifest declares the template contract as:
+
+```json
+"prompt_template": {
+  "format": "rendered_text",
+  "placeholder": "{INPUT_N}"
+}
+```
+
+This is the template field inside the full runtime manifest, not a standalone
+manifest. Keep the required model, projector, preprocessing and adapter metadata.
+
 `paw.Image(source)` accepts a local file path, encoded image bytes, or a Pillow
 image. For an image URL, download the file first. Plain strings are text inputs.
 
-Image functions return a string. Generation options are passed by keyword:
+Image functions return a string. Their positional argument count and order
+come from the template. Generation options are passed by keyword:
 
 ```python
 output: str = fn(

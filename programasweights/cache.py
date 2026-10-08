@@ -30,6 +30,7 @@ from typing import Iterator, TypedDict
 import httpx
 
 from . import config
+from ._prompt_template import parse_template
 from ._output import ProgressCallback, report_progress
 from ._vision_contract import (
     BUILTIN_VISION_RUNTIMES,
@@ -1213,11 +1214,16 @@ def validate_program_assets_dir(
     if not isinstance(meta, dict) or meta.get("program_id") != expected_program_id:
         return False
     if declares_vision(meta):
-        # The same archive member now holds literal system instructions.
-        # It must never be interpreted as a rendered-text placeholder template.
-        return _normalize_runtime_manifest_for_program(
+        runtime = _normalize_runtime_manifest_for_program(
             meta.get("runtime"), meta,
-        ) is not None
+        )
+        if runtime is None:
+            return False
+        try:
+            parse_template(template, runtime["prompt_template"]["placeholder"])
+        except ValueError:
+            return False
+        return True
     if template.count(INPUT_PLACEHOLDER) != 1:
         return False
     interpreter = meta.get("interpreter")

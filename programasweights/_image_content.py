@@ -105,3 +105,32 @@ def _to_chat_content(*parts: Union[str, Image]) -> List[Dict[str, Any]]:
                 "image_url": {"url": _image_url(part, index)},
             })
     return content
+
+
+def _to_prompt(*parts: Union[str, Image], image_marker: str) -> tuple:
+    """Convert bound parts into exact prompt text and ordered image URLs."""
+    if not isinstance(image_marker, str) or not image_marker:
+        raise ValueError("The backend image marker must be a nonempty string.")
+
+    text = []
+    images = []
+    for index, part in enumerate(_normalize_parts(*parts), start=1):
+        if isinstance(part, str):
+            if image_marker in part:
+                raise ValueError(
+                    "The backend image marker is reserved; use paw.Image."
+                )
+            text.append(part)
+        else:
+            text.append(image_marker)
+            images.append((index, part))
+
+    prompt = "".join(text)
+    # Also catch a reserved marker formed across adjacent text parts.
+    if prompt.count(image_marker) != len(images):
+        raise ValueError(
+            "The backend image marker is reserved; use paw.Image."
+        )
+
+    urls = [_image_url(image, index) for index, image in images]
+    return prompt, urls

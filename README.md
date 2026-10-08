@@ -125,17 +125,29 @@ Install the optional image dependencies:
 pip install "programasweights[vision]" --extra-index-url https://pypi.programasweights.com/simple/
 ```
 
-Prompt Qwen3.5-0.8B locally with text and images (no adapter applied):
+The unreleased numbered-template API lets you specify the complete prompt for
+text-only or image-capable base models. For Qwen3.5-0.8B with no adapter:
 
 ```python
 import programasweights as paw
 
-describe = paw.function(None, interpreter="Qwen/Qwen3.5-0.8B")
+prompt = (
+    "<|im_start|>user\n{INPUT_0}\n{INPUT_1}<|im_end|>\n"
+    "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+)
+describe = paw.function(
+    None, interpreter="Qwen/Qwen3.5-0.8B", prompt_template=prompt,
+)
 print(describe("Describe this image.", paw.Image("photo.png")))
 ```
 
-To use a compiled image program, load its `.paw` file with
-`paw.function("./locator.paw")`.
+`{INPUT_0}`, `{INPUT_1}`, etc. insert positional arguments into the prompt.
+Placeholders can repeat or appear in any order. The template supplies the
+model's role markers and assistant prefix. For text-only models such as
+`Qwen/Qwen3-0.6B`, pass string inputs.
+
+Load a compiled image program with `paw.function("./locator.paw")`, then pass
+the arguments required by its prompt template.
 
 See the [image API reference](docs/api-reference/python-sdk.md#local-textimage-calls)
 for multiple images, input formats, and result metadata.

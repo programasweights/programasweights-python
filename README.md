@@ -125,7 +125,7 @@ Install the optional image dependencies:
 pip install "programasweights[vision]" --extra-index-url https://pypi.programasweights.com/simple/
 ```
 
-The unreleased numbered-template API lets you specify the complete prompt for
+Use `prompt_template=` (SDK 0.4.13+) to specify the complete prompt for
 text-only or image-capable base models. For Qwen3.5-0.8B with no adapter:
 
 ```python

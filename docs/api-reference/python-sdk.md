@@ -43,7 +43,7 @@ bundle directly. Required runtime metadata and base models are cached for reuse.
 | `offline` | Use only local files/cache and make zero network calls; fail if required validated assets are missing. `PAW_OFFLINE=1` has the same effect. |
 | `remote` | Run hosted inference without downloading model assets (default `False`). Accepts a `Program` object, ID, or slug. Cannot be combined with offline mode, local file paths, `interpreter`, or non-default local runtime options. |
 | `interpreter` | Advanced adapter-free mode only. Must be passed by keyword and only when `program_id` is explicitly `None`. Supported values are `Qwen/Qwen3-0.6B`, `gpt2`, and `Qwen/Qwen3.5-0.8B`. |
-| `prompt_template` | Unreleased. Optional complete numbered template for a local base interpreter. Pass by keyword with `program_id=None`. Works with text-only and image-capable models. Cannot override a compiled bundle or be used with `remote=True`. |
+| `prompt_template` | SDK 0.4.13+. Optional complete numbered template for a local base interpreter. Pass by keyword with `program_id=None`. Works with text-only and image-capable models. Cannot override a compiled bundle or be used with `remote=True`. |
 
 For existing local text-only programs and text base interpreters without an
 explicit `prompt_template`, the returned callable accepts:
@@ -153,7 +153,7 @@ The Qwen3 interpreter uses its chat template with thinking disabled. GPT-2 uses
 the input as a raw prompt. These defaults are unchanged when `prompt_template`
 is omitted.
 
-#### Complete numbered templates (unreleased)
+#### Complete numbered templates (SDK 0.4.13+)
 
 For a local base model, pass `prompt_template=` when loading the function to
 specify the complete prompt. This option works for both text-only and
@@ -213,8 +213,8 @@ inputs and keyword generation options described above.
 
 ### Local text/image calls
 
-Install `programasweights[vision]` to use Qwen3.5-0.8B. With the unreleased
-numbered-template API, order images and text through the complete template:
+Install `programasweights[vision]` to use Qwen3.5-0.8B. Use
+`prompt_template=` (SDK 0.4.13+) to order images and text:
 
 ```python
 prompt = (

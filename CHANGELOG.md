@@ -1,13 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.4.13 (2026-10-07)
 
-- Add `prompt_template=` for local adapter-free text and image interpreters,
-  using shared numbered positional placeholders with repeatable, ordered slots.
-- Execute complete image prompt templates directly, without an added chat
-  wrapper. Older experimental image bundles must be re-exported with the
-  `rendered_text` / `{INPUT_N}` contract and a complete prompt template.
-- Preserve existing compiled text templates, call conventions and prefix caches.
+- Add `prompt_template=` for local base models (no adapter applied), with
+  text and image inputs.
+- Use `{INPUT_0}`, `{INPUT_1}`, etc. to place, repeat, or reorder inputs
+  in a prompt.
+- Image `.paw` bundles use the `rendered_text` / `{INPUT_N}` template format.
 
 ## 0.4.12 (2026-10-07)
 

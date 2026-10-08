@@ -31,7 +31,7 @@ try:
     from importlib.metadata import version as _meta_version
     __version__ = _meta_version("programasweights")
 except Exception:
-    __version__ = "0.4.12"
+    __version__ = "0.4.13"
 
 from ._inputs import Image
 from ._result import FunctionResult

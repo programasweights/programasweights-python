@@ -147,10 +147,8 @@ adds no chat wrapper; the template supplies roles and the assistant prefix.
 The same option supports text-only models such as `Qwen/Qwen3-0.6B`, with string
 arguments. Existing text calls without this option retain their behavior.
 
-Compiled image programs read the complete template from their `.paw` bundle:
-load with `paw.function("./locator.paw")` and supply the arguments its slots
-require. Older experimental image bundles using `chat_messages` metadata must
-be re-exported with a complete numbered template; there is no automatic fallback.
+Load a compiled image program with `paw.function("./locator.paw")`, then pass
+the arguments required by its prompt template.
 
 See the [image API reference](docs/api-reference/python-sdk.md#local-textimage-calls)
 for multiple images, input formats, and result metadata.

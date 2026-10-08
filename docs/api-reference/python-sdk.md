@@ -165,14 +165,13 @@ prompt = (
     "<|im_start|>user\n{INPUT_1}<|im_end|>\n"
     "<|im_start|>assistant\n<think>\n\n</think>\n\n"
 )
-with paw.function(
+answer = paw.function(
     None, interpreter="Qwen/Qwen3-0.6B", prompt_template=prompt,
-) as answer:
-    output = answer(
-        "Answer using only the facts in the question.",
-        "Alice owns three cats. How many cats does Alice own?",
-        max_tokens=32,
-    )
+)
+output = answer(
+    "Answer using only the facts in the question.",
+    "Alice owns three cats. How many cats does Alice own?",
+)
 ```
 
 The template controls role delimiters, examples, whitespace, thinking markers

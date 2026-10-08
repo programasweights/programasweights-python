@@ -141,11 +141,10 @@ describe = paw.function(
 print(describe("Describe this image.", paw.Image("photo.png")))
 ```
 
-`{INPUT_0}`, `{INPUT_1}`, and subsequent numbered slots bind positional arguments
-where they appear in the template. Slots may repeat or change order. The SDK
-adds no chat wrapper; the template supplies roles and the assistant prefix.
-The same option supports text-only models such as `Qwen/Qwen3-0.6B`, with string
-arguments. Existing text calls without this option retain their behavior.
+`{INPUT_0}`, `{INPUT_1}`, etc. insert positional arguments into the prompt.
+Placeholders can repeat or appear in any order. The template supplies the
+model's role markers and assistant prefix. For text-only models such as
+`Qwen/Qwen3-0.6B`, pass string inputs.
 
 Load a compiled image program with `paw.function("./locator.paw")`, then pass
 the arguments required by its prompt template.

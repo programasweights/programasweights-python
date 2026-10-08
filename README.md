@@ -135,10 +135,10 @@ prompt = (
     "<|im_start|>user\n{INPUT_0}\n{INPUT_1}<|im_end|>\n"
     "<|im_start|>assistant\n<think>\n\n</think>\n\n"
 )
-with paw.function(
+describe = paw.function(
     None, interpreter="Qwen/Qwen3.5-0.8B", prompt_template=prompt,
-) as describe:
-    print(describe("Describe this image.", paw.Image("photo.png")))
+)
+print(describe("Describe this image.", paw.Image("photo.png")))
 ```
 
 `{INPUT_0}`, `{INPUT_1}`, and subsequent numbered slots bind positional arguments

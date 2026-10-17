@@ -169,14 +169,6 @@ class _Runtime:
 
         marker = mtmd.mtmd_default_marker().decode("utf-8")
         prompt, urls = _to_prompt(*parts, image_marker=marker)
-        encoded = prompt.encode("utf-8")
-
-        input_text = mtmd.mtmd_input_text()
-        input_text.text = encoded
-        input_text.text_len = len(encoded)
-        input_text.add_special = False
-        input_text.parse_special = True
-
         bitmaps = []
         chunks = None
         try:
@@ -188,70 +180,90 @@ class _Runtime:
                     raise RuntimeError("Failed to create image bitmap.")
                 bitmaps.append(bitmap)
 
-            chunks = mtmd.mtmd_input_chunks_init()
-            if not chunks:
-                raise RuntimeError("Failed to allocate prompt chunks.")
+            # PAW images are independent stills. Some native Qwen backends
+            # merge adjacent same-size bitmaps as video frames, changing the
+            # trained representation. Tokenize one image per call without
+            # inserting separators or changing any literal prompt text.
+            text_segments = prompt.split(marker)
+            groups = [(prompt, [])] if not bitmaps else [
+                (text_segments[i] + marker +
+                 (text_segments[-1] if i == len(bitmaps) - 1 else ""), [bitmap])
+                for i, bitmap in enumerate(bitmaps)
+            ]
+            for text, group in groups:
+                encoded = text.encode("utf-8")
+                input_text = mtmd.mtmd_input_text()
+                input_text.text = encoded
+                input_text.text_len = len(encoded)
+                input_text.add_special = False
+                input_text.parse_special = True
+                chunks = mtmd.mtmd_input_chunks_init()
+                if not chunks:
+                    raise RuntimeError("Failed to allocate prompt chunks.")
 
-            bitmap_array = (
-                mtmd.mtmd_bitmap_p_ctypes * len(bitmaps)
-            )(*bitmaps)
-            result = mtmd.mtmd_tokenize(
-                handler.mtmd_ctx,
-                chunks,
-                ctypes.byref(input_text),
-                bitmap_array,
-                len(bitmaps),
-            )
-            if result != 0:
-                raise ValueError(f"Prompt tokenization failed: {result}.")
+                bitmap_array = (
+                    mtmd.mtmd_bitmap_p_ctypes * len(group)
+                )(*group)
+                result = mtmd.mtmd_tokenize(
+                    handler.mtmd_ctx,
+                    chunks,
+                    ctypes.byref(input_text),
+                    bitmap_array,
+                    len(group),
+                )
+                if result != 0:
+                    raise ValueError(f"Prompt tokenization failed: {result}.")
 
-            for index in range(mtmd.mtmd_input_chunks_size(chunks)):
-                chunk = mtmd.mtmd_input_chunks_get(chunks, index)
-                if not chunk:
-                    raise RuntimeError("Missing prompt chunk.")
+                for index in range(mtmd.mtmd_input_chunks_size(chunks)):
+                    chunk = mtmd.mtmd_input_chunks_get(chunks, index)
+                    if not chunk:
+                        raise RuntimeError("Missing prompt chunk.")
 
-                size = mtmd.mtmd_input_chunk_get_n_tokens(chunk)
-                if model.n_tokens + size >= model.n_ctx():
-                    raise ValueError("Prompt leaves no room for output.")
+                    size = mtmd.mtmd_input_chunk_get_n_tokens(chunk)
+                    if model.n_tokens + size >= model.n_ctx():
+                        raise ValueError("Prompt leaves no room for output.")
 
-                kind = mtmd.mtmd_input_chunk_get_type(chunk)
-                if kind == mtmd.MTMD_INPUT_CHUNK_TYPE_TEXT:
-                    count = ctypes.c_size_t()
-                    tokens = mtmd.mtmd_input_chunk_get_tokens_text(
-                        chunk, ctypes.byref(count)
-                    )
-                    if count.value:
-                        if not tokens:
-                            raise RuntimeError("Missing text tokens.")
-                        model.eval([tokens[i] for i in range(count.value)])
-
-                elif kind == mtmd.MTMD_INPUT_CHUNK_TYPE_IMAGE:
-                    start = model.n_tokens
-                    end = self.lib.llama_pos(0)
-                    result = mtmd.mtmd_helper_eval_chunk_single(
-                        handler.mtmd_ctx,
-                        model._ctx.ctx,
-                        chunk,
-                        self.lib.llama_pos(start),
-                        self.lib.llama_seq_id(0),
-                        model.n_batch,
-                        True,
-                        ctypes.byref(end),
-                    )
-                    if result != 0:
-                        raise RuntimeError(
-                            f"Image evaluation failed: {result}."
+                    kind = mtmd.mtmd_input_chunk_get_type(chunk)
+                    if kind == mtmd.MTMD_INPUT_CHUNK_TYPE_TEXT:
+                        count = ctypes.c_size_t()
+                        tokens = mtmd.mtmd_input_chunk_get_tokens_text(
+                            chunk, ctypes.byref(count)
                         )
-                    if not start < end.value < model.n_ctx():
-                        raise RuntimeError("Invalid image end position.")
+                        if count.value:
+                            if not tokens:
+                                raise RuntimeError("Missing text tokens.")
+                            model.eval([tokens[i] for i in range(count.value)])
 
-                    # Image embeddings occupy these positions. These zeros
-                    # are Python bookkeeping, not tokens sent to the model.
-                    model.input_ids[start:end.value] = 0
-                    model.n_tokens = end.value
-                    model._requires_eval = False
-                else:
-                    raise ValueError("Unsupported prompt chunk type.")
+                    elif kind == mtmd.MTMD_INPUT_CHUNK_TYPE_IMAGE:
+                        start = model.n_tokens
+                        end = self.lib.llama_pos(0)
+                        result = mtmd.mtmd_helper_eval_chunk_single(
+                            handler.mtmd_ctx,
+                            model._ctx.ctx,
+                            chunk,
+                            self.lib.llama_pos(start),
+                            self.lib.llama_seq_id(0),
+                            model.n_batch,
+                            True,
+                            ctypes.byref(end),
+                        )
+                        if result != 0:
+                            raise RuntimeError(
+                                f"Image evaluation failed: {result}."
+                            )
+                        if not start < end.value < model.n_ctx():
+                            raise RuntimeError("Invalid image end position.")
+
+                        # Image embeddings occupy these positions. These zeros
+                        # are Python bookkeeping, not tokens sent to the model.
+                        model.input_ids[start:end.value] = 0
+                        model.n_tokens = end.value
+                        model._requires_eval = False
+                    else:
+                        raise ValueError("Unsupported prompt chunk type.")
+
+                mtmd.mtmd_input_chunks_free(chunks)
+                chunks = None
 
             if model.n_tokens == 0:
                 raise ValueError("The prompt produced no tokens.")

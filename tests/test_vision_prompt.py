@@ -43,7 +43,7 @@ class Vector(list):
 @pytest.fixture
 def native():
     state = NS(chunks=[], flags=None, loaded=[], freed=[], chunk_freed=False,
-               images=[], fail_tokenize=False, fail_image=False)
+               images=[], fail_tokenize=False, fail_image=False, prompts=[])
     model = NS(n_tokens=0, input_ids=Vector([0] * 256), n_ctx=lambda: 256,
                _ctx=NS(ctx=None), n_batch=128)
     def evaluate(tokens):
@@ -54,6 +54,7 @@ def native():
         prompt = ptr._obj
         state.flags = (prompt.add_special, prompt.parse_special)
         state.text = prompt.text[:prompt.text_len].decode()
+        state.prompts.append(state.text)
         state.chunks = []
         for i, piece in enumerate(state.text.split("<__media__>")):
             if i:
@@ -103,7 +104,8 @@ def test_exact_text_and_image_order_no_wrapping_or_special_token_insertion(nativ
     state, handler, model, lib = native
     prompt = evaluate_prompt(handler, model, [text(" pre"), text("fix "), image("B"),
         text("mid"), image("A"), image("B"), text("end\n ")], lib)
-    assert state.text == " prefix <__media__>mid<__media__><__media__>end\n "
+    assert "".join(state.prompts) == " prefix <__media__>mid<__media__><__media__>end\n "
+    assert all(p.count("<__media__>") <= 1 for p in state.prompts)
     assert state.flags == (False, True)
     assert state.loaded == ["B", "A", "B"]
     assert state.images == [(1, True), (2, True), (3, True)]
@@ -266,3 +268,18 @@ def test_evaluation_error_prevents_generation():
     with pytest.raises(RuntimeError, match='native failure'):
         _Runtime._complete_prompt(owner, ('input',), max_tokens=8, temperature=0)
     owner.llm.create_completion.assert_not_called()
+
+
+def test_adjacent_images_are_not_exposed_to_native_video_merging(native):
+    state, handler, model, lib = native
+    tokenize = handler._mtmd_cpp.mtmd_tokenize
+    def merges_video(*args):
+        result = tokenize(*args)
+        if "<__media__><__media__>" in state.text:
+            state.chunks = [c for i, c in enumerate(state.chunks)
+                            if not (i and c.kind == state.chunks[i - 1].kind == 2)]
+        return result
+    handler._mtmd_cpp.mtmd_tokenize = merges_video
+    evaluate_prompt(handler, model, [image("A"), image("B")], lib)
+    assert state.images == [(1, True), (2, True)]
+    assert "".join(state.prompts) == "<__media__><__media__>"

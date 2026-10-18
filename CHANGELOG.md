@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.14 (2026-10-18)
+
+- Fix local vision inference with adjacent images on llama-cpp-python 0.3.35,
+  preserving each image as an independent input.
+
 ## 0.4.13 (2026-10-07)
 
 - Add `prompt_template=` for local base models (no adapter applied), with

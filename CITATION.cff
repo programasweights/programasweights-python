@@ -10,7 +10,7 @@ authors:
 repository-code: https://github.com/programasweights/programasweights-python
 url: https://programasweights.com/
 preferred-citation:
-  type: article
+  type: conference-paper
   title: 'Program-as-Weights: A Programming Paradigm for Fuzzy Functions'
   authors:
   - family-names: Zhang
@@ -26,10 +26,8 @@ preferred-citation:
   - family-names: Deng
     given-names: Yuntian
   year: 2026
-  date-released: '2026-07-02'
-  journal: arXiv
-  doi: 10.48550/arXiv.2607.02512
-  url: https://arxiv.org/abs/2607.02512
+  collection-title: The Fortieth Annual Conference on Neural Information Processing Systems
+  url: https://openreview.net/forum?id=ppCD0mb6ty
 references:
 - type: article
   title: 'Compile by Training: Turning Natural-Language Specifications into Local Neural Functions'

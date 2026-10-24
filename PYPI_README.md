@@ -228,7 +228,7 @@ paw login
 
 If you use Program-as-Weights in your research, please cite the [Program-as-Weights paper](https://arxiv.org/abs/2607.02512). If you use the training-based compiler, please also cite [Compile by Training](https://arxiv.org/abs/2609.04199).
 
-**[Program-as-Weights: A Programming Paradigm for Fuzzy Functions](https://openreview.net/forum?id=ppCD0mb6ty)**
+**[Program-as-Weights: A Programming Paradigm for Fuzzy Functions](https://arxiv.org/abs/2607.02512)**
 
 NeurIPS 2026 · [Preprint](https://arxiv.org/abs/2607.02512)
 
@@ -238,7 +238,7 @@ NeurIPS 2026 · [Preprint](https://arxiv.org/abs/2607.02512)
   author = {Zhang, Wentao and Hotsko, Liliana and Kim, Woojeong and Nie, Pengyu and Shieber, Stuart and Deng, Yuntian},
   booktitle = {The Fortieth Annual Conference on Neural Information Processing Systems},
   year = {2026},
-  url = {https://openreview.net/forum?id=ppCD0mb6ty}
+  url = {https://arxiv.org/abs/2607.02512}
 }
 ```
 

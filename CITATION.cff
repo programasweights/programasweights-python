@@ -39,5 +39,21 @@ references:
   - family-names: Shieber
     given-names: Stuart
   year: 2026
-  collection-title: EMNLP 2026 System Demonstrations
-  url: https://arxiv.org/abs/2609.04199
+  collection-title: 'Proceedings of the 2026 Conference on Empirical Methods in Natural Language Processing: System Demonstrations'
+  url: https://aclanthology.org/2026.emnlp-demos.78/
+  month: 10
+  editors:
+  - family-names: Agrawal
+    given-names: Sweta
+  - family-names: Abad
+    given-names: Alberto
+  publisher:
+    name: Association for Computational Linguistics
+  conference:
+    name: EMNLP 2026 System Demonstrations
+    city: Budapest
+    country: HU
+  doi: 10.18653/2026.emnlp-demos.78
+  start: 830
+  end: 839
+  isbn: 979-8-89176-461-3

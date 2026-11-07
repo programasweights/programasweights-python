@@ -226,7 +226,7 @@ paw login
 
 ## Citation
 
-If you use Program-as-Weights in your research, please cite the [Program-as-Weights paper](https://arxiv.org/abs/2607.02512). If you use the training-based compiler, please also cite [Compile by Training](https://arxiv.org/abs/2609.04199).
+If you use Program-as-Weights in your research, please cite the [Program-as-Weights paper](https://arxiv.org/abs/2607.02512). If you use the training-based compiler, please also cite [Compile by Training](https://aclanthology.org/2026.emnlp-demos.78/).
 
 **[Program-as-Weights: A Programming Paradigm for Fuzzy Functions](https://arxiv.org/abs/2607.02512)**
 
@@ -242,14 +242,23 @@ NeurIPS 2026 · [Preprint](https://arxiv.org/abs/2607.02512)
 }
 ```
 
-**[Compile by Training: Turning Natural-Language Specifications into Local Neural Functions](https://arxiv.org/abs/2609.04199)**
+**[Compile by Training: Turning Natural-Language Specifications into Local Neural Functions](https://aclanthology.org/2026.emnlp-demos.78/)**
+
+EMNLP 2026 System Demonstrations · [Preprint](https://arxiv.org/abs/2609.04199)
 
 ```bibtex
-@inproceedings{paw_2609_04199,
+@inproceedings{deng-etal-2026-compile,
   title = {{Compile by Training: Turning Natural-Language Specifications into Local Neural Functions}},
   author = {Deng, Yuntian and Nie, Pengyu and Shieber, Stuart},
-  booktitle = {EMNLP 2026 System Demonstrations},
+  editor = {Agrawal, Sweta and Abad, Alberto},
+  booktitle = {Proceedings of the 2026 Conference on Empirical Methods in Natural Language Processing: System Demonstrations},
+  month = oct,
   year = {2026},
-  url = {https://arxiv.org/abs/2609.04199}
+  address = {Budapest, Hungary},
+  publisher = {Association for Computational Linguistics},
+  url = {https://aclanthology.org/2026.emnlp-demos.78/},
+  doi = {10.18653/2026.emnlp-demos.78},
+  pages = {830--839},
+  ISBN = {979-8-89176-461-3}
 }
 ```

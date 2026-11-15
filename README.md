@@ -223,6 +223,7 @@ paw login
 - **Python SDK**: [github.com/programasweights/programasweights-python](https://github.com/programasweights/programasweights-python)
 - **Browser SDK**: [github.com/programasweights/programasweights-js](https://github.com/programasweights/programasweights-js)
 - **Program Hub**: [programasweights.com/hub](https://programasweights.com/hub)
+- [Discussions](https://github.com/programasweights/programasweights-python/discussions)
 
 ## Citation
 

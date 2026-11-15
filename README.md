@@ -4,8 +4,6 @@
 
 Define what a function should do in plain English. PAW compiles it into a small neural program that runs on your machine — no API keys at runtime, no internet needed after setup, fully deterministic.
 
-Ask questions and share what you built in [GitHub Discussions](https://github.com/programasweights/programasweights-python/discussions).
-
 ## Install
 
 ```bash
